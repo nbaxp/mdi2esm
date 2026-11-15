@@ -64,13 +64,12 @@ import 'katex/dist/katex.min.css';
 ```sh
 npm install          # 安装依赖
 npm run build        # 构建 dist/index.js 与 dist/index.min.js
-npm run sync         # 把 src 同步到宿主 esm / mdoc 的 lib 副本（仓库内使用）
 npm test             # 运行 node:test 测试
 npm run lint         # eslint 检查（--max-warnings 0）
 npm run lint:fix     # eslint 自动修复
 ```
 
-构建使用 Vite 8（rolldown 打包）。关于本包在 esm / mdoc 宿主中的同步与 import map 约定，见仓库内 `scripts/sync.js`。
+构建使用 Vite 8（rolldown 打包）。宿主项目通过 npm 安装本包后，用 npm2esm 等工具预构建为浏览器 ESM 产物并配合 import map 使用。
 
 ## 发布说明
 
