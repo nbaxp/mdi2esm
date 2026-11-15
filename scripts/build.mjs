@@ -58,6 +58,11 @@ async function main() {
     root,
     base: './',
     logLevel: 'warn',
+    // demo 走 createMarkdownComponent，运行时用 compile() 编译 Markdown 生成的 template，
+    // 必须 alias 到含完整编译器的构建（runtime 版 compile 是占位 stub，会抛错）。
+    resolve: {
+      alias: { vue: 'vue/dist/vue.esm-bundler.js' },
+    },
     define: {
       __VUE_OPTIONS_API__: 'true',
       __VUE_PROD_DEVTOOLS__: 'false',

@@ -4,10 +4,33 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>mdi2esm demo</title>
-    <!-- 完整打包版外部化框架与重依赖（vue / vue-style-runtime / katex / mermaid / medium-zoom / shiki /
-         @shikijs/transformers），由消费方提供。本页由 Vite 构建（build.mjs）：
-         以 dist/index.min.js 为依赖入口，Vite 自动解析这些裸包并 bundle 进 demo，无需 importmap/vendor。 -->
+    <!--
+      全面 demo：示例源来自独立的 demo/sample.md（?raw 载入，可实时编辑）。
+      渲染走 createMarkdownComponent 完整管线（含 frontmatter、Shiki 高亮、KaTeX、Badge、script setup），
+      由 Vue createApp 挂载。本页由 Vite 构建（build.mjs）：以 dist/index.min.js 为库入口，
+      Vue / katex / mermaid / shiki 等 peer 由 Vite 从本包 node_modules 解析并 bundle。
+    -->
     <style>
+      :root {
+        --vp-c-text-1: #1f2328;
+        --vp-c-text-2: #656d76;
+        --vp-c-bg: #ffffff;
+        --vp-c-bg-soft: #f6f8fa;
+        --vp-c-bg-alt: #f6f8fa;
+        --vp-c-divider: #d0d7de;
+        --vp-c-border: #d0d7de;
+        --vp-c-brand-1: #3451b2;
+      }
+      html.dark {
+        --vp-c-text-1: #e6edf3;
+        --vp-c-text-2: #9198a1;
+        --vp-c-bg: #1b1b1f;
+        --vp-c-bg-soft: #252529;
+        --vp-c-bg-alt: #252529;
+        --vp-c-divider: #3a3a3f;
+        --vp-c-border: #3a3a3f;
+        --vp-c-brand-1: #a8b1ff;
+      }
       body {
         margin: 0;
         font-family:
@@ -48,7 +71,8 @@
         height: 78vh;
         box-sizing: border-box;
         font-family: ui-monospace, monospace;
-        font-size: 13px;
+        font-size: 12px;
+        line-height: 1.5;
         border: 1px solid var(--vp-c-divider);
         border-radius: 8px;
         padding: 12px;
@@ -59,7 +83,7 @@
       .rendered {
         border: 1px solid var(--vp-c-divider);
         border-radius: 8px;
-        padding: 0 16px;
+        padding: 0 16px 16px;
         overflow: auto;
         height: 78vh;
       }
@@ -70,18 +94,129 @@
         color: var(--vp-c-text-2);
         margin: 0 0 6px;
       }
+      #outline a {
+        display: block;
+        color: var(--vp-c-text-2);
+        text-decoration: none;
+        font-size: 13px;
+        padding: 2px 0;
+      }
+      #outline a:hover {
+        color: var(--vp-c-brand-1);
+      }
+      /* VitePress 官方近似样式：demo 不发布 CSS，这里内联让所有能力可见 */
+      .vp-doc .header-anchor {
+        opacity: 0;
+        margin-left: 8px;
+        text-decoration: none;
+      }
+      .vp-doc h2:hover .header-anchor,
+      .vp-doc h3:hover .header-anchor {
+        opacity: 1;
+      }
+      .vp-doc .header-anchor::before {
+        content: '#';
+        color: var(--vp-c-brand-1);
+      }
+      .vp-doc .table-of-contents {
+        border: 1px solid var(--vp-c-divider);
+        border-radius: 8px;
+        padding: 8px 16px;
+        background: var(--vp-c-bg-soft);
+      }
+      .vp-doc .table-of-contents ul {
+        margin: 4px 0;
+        padding-left: 20px;
+      }
+      .vp-doc .custom-block {
+        margin: 16px 0;
+        padding: 12px 16px;
+        border-radius: 8px;
+        border-left: 4px solid var(--vp-c-brand-1);
+        background: var(--vp-c-bg-soft);
+      }
+      .vp-doc .custom-block.tip,
+      .vp-doc .custom-block.info {
+        border-left-color: #42b883;
+      }
+      .vp-doc .custom-block.warning,
+      .vp-doc .custom-block.caution {
+        border-left-color: #e7b100;
+      }
+      .vp-doc .custom-block.danger {
+        border-left-color: #e34c4c;
+      }
+      .vp-doc .custom-block .custom-block-title {
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      .vp-doc .VPBadge {
+        display: inline-block;
+        border-radius: 0.75rem;
+        padding: 0 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        line-height: 1.6;
+        color: #fff;
+        background: #42b883;
+      }
+      .vp-doc .VPBadge.warning {
+        background: #e7b100;
+      }
+      .vp-doc .VPBadge.danger {
+        background: #e34c4c;
+      }
+      .vp-doc .vp-code-group {
+        margin: 16px 0;
+        border: 1px solid var(--vp-c-divider);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .vp-doc .vp-code-group .tabs {
+        display: flex;
+        gap: 4px;
+        padding: 8px;
+        background: var(--vp-c-bg-soft);
+      }
+      .vp-doc .vp-code-group .tabs input {
+        display: none;
+      }
+      .vp-doc .vp-code-group .tabs label {
+        cursor: pointer;
+        padding: 2px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+      }
+      .vp-doc .vp-code-group .blocks > div {
+        display: none;
+      }
+      .vp-doc .vp-code-group .blocks > div.active {
+        display: block;
+      }
+      .vp-doc img {
+        max-width: 100%;
+      }
+      .vp-doc table {
+        border-collapse: collapse;
+        margin: 16px 0;
+      }
+      .vp-doc th,
+      .vp-doc td {
+        border: 1px solid var(--vp-c-divider);
+        padding: 6px 12px;
+      }
     </style>
   </head>
   <body>
     <header>
       <strong>mdi2esm</strong>
-      <span>完整打包版 demo（dist/index.min.js；外部 peer 由 Vite 构建时自动解析并 bundle）</span>
+      <span>全面 demo · 独立 md 源 · 完整渲染管线</span>
       <button id="render">渲染</button>
       <button id="toggle-theme">深色</button>
     </header>
     <main>
       <section>
-        <p class="col-title">Markdown 源</p>
+        <p class="col-title">Markdown 源（demo/sample.md）</p>
         <textarea id="src" spellcheck="false"></textarea>
       </section>
       <section>
@@ -90,105 +225,77 @@
       </section>
       <aside>
         <p class="col-title">大纲</p>
-        <nav id="outline" class="vp-doc-outline"></nav>
+        <nav id="outline"></nav>
       </aside>
     </main>
 
     <script type="module">
-      // demo 样式走 src 源文件与 peer，由 Vite 构建时 bundle 进 assets，不依赖 dist 里的发布产物副本
+      // 样式源文件由 Vite 打包进 assets
       import './src/styles/mdi2esm.css';
-      // katex 是 peer：CSS/字体由 katex 包提供，Vite 构建时解析并 bundle 进 assets
       import 'katex/dist/katex.min.css';
-      import {
-        renderMarkdown,
-        renderMath,
-        mountMermaid,
-        mountImageZoom,
-        buildOutline,
-        createConfig,
-      } from './dist/index.min.js';
-
-      const SAMPLE = `---
-title: 示例文档
----
-
-# 标题一
-## 标题二
-内容段落，支持 **加粗**、*斜体*、\`行内代码\` 与 [链接](https://example.com)。
-
-## 自定义容器
-::: tip
-这是一个 tip 提示块。
-:::
-::: warning
-这是一个 warning 警告块。
-:::
-::: danger
-危险操作。
-:::
-::: details 点击展开
-折叠内容。
-:::
-
-## 代码高亮
-\`\`\`js
-const a = 1;
-console.log(a);
-\`\`\`
-
-## 数学公式
-行内 $E = mc^2$，块级：
-$$
-\\int_0^1 x^2 \\, dx = \\frac{1}{3}
-$$
-
-## 图表
-\`\`\`mermaid
-graph TD; A-->B; B-->C;
-\`\`\`
-
-## 图片
-![示意图](https://picsum.photos/600/300)
-`;
+      import { createApp, h } from 'vue';
+      // 独立 md 源文件，作为可编辑示例的初始值
+      import sample from './demo/sample.md?raw';
+      import { buildOutline, createConfig, createMarkdownComponent } from './dist/index.min.js';
 
       const ta = document.getElementById('src');
-      const out = document.getElementById('content');
       const outline = document.getElementById('outline');
-      ta.value = SAMPLE;
+      ta.value = sample;
 
-      const config = createConfig();
+      // 自定义容器：由 config 驱动（非纯 Markdown 语法），演示 ::: demo
+      const config = createConfig({
+        markdown: {
+          lineNumbers: false,
+          container: [{ type: 'demo', title: '自定义容器' }],
+        },
+      });
+
+      let app = null;
 
       function renderOutline(items, container) {
         for (const it of items) {
           const a = document.createElement('a');
           a.href = it.link;
           a.textContent = it.title;
-          a.style.display = 'block';
           container.append(a);
           if (it.children && it.children.length) {
-            const childNav = document.createElement('div');
-            childNav.style.paddingLeft = '12px';
-            container.append(childNav);
-            renderOutline(it.children, childNav);
+            const box = document.createElement('div');
+            box.style.paddingLeft = '12px';
+            renderOutline(it.children, box);
+            container.append(box);
           }
         }
       }
 
       async function run() {
-        const { html, headings } = renderMarkdown(ta.value, { dir: '', config });
-        const finalHtml = await renderMath(html, config);
-        out.innerHTML = finalHtml;
-        mountMermaid();
-        mountImageZoom();
+        // 完整管线：frontmatter / Shiki 高亮 / KaTeX / Badge / script setup / 容器 全部在此完成
+        const { component, headings } = await createMarkdownComponent(ta.value, '', config);
+        if (app) app.unmount();
+        const host = document.getElementById('content');
+        host.innerHTML = '';
+        if (component) {
+          app = createApp({
+            render: () => h(component),
+          });
+          app.mount(host);
+        }
         outline.innerHTML = '';
         renderOutline(buildOutline(headings), outline);
       }
 
-      document.getElementById('render').addEventListener('click', run);
+      document.getElementById('render').addEventListener('click', () => {
+        run().catch((err) => {
+          document.getElementById('content').textContent = '渲染失败：' + err.message;
+          console.error(err);
+        });
+      });
       document.getElementById('toggle-theme').addEventListener('click', () => {
         document.documentElement.classList.toggle('dark');
       });
-      run();
+      run().catch((err) => {
+        document.getElementById('content').textContent = '渲染失败：' + err.message;
+        console.error(err);
+      });
     </script>
   </body>
 </html>
