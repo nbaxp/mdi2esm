@@ -184,11 +184,11 @@ graph TD
 
 ## 11. 图片与缩放
 
-![可点击放大的图片](https://picsum.photos/640/240)
+![可点击放大的图片](sample-banner.svg)
 
-[![被链接包裹的图片（不启用缩放）](https://picsum.photos/200/120)](https://example.com)
+[![被链接包裹的图片（不启用缩放）](sample-thumb.svg)](https://example.com)
 
-点击第一张图片可用 medium-zoom 放大；被链接包裹的图片按规则排除缩放。
+点击第一张图片可用 medium-zoom 放大（图为本地资源，离线也能显示）；被链接包裹的图片按规则排除缩放。图片还被自动加上 `loading="lazy"`。
 
 ## 12. Vue 组件（Badge）
 
