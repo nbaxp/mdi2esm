@@ -1,0 +1,14 @@
+# 构建产物（由 `npm run build` 生成）
+dist/
+
+# 依赖
+node_modules/
+
+# npm 打包/调试临时文件
+*.tgz
+.npm/
+.npmrc
+npm-debug.log*
+
+# 编辑器/系统
+.DS_Store
