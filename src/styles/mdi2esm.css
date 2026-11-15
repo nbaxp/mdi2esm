@@ -1,4 +1,4 @@
-/* markdown-rt 渲染样式（自包含，不依赖 VitePress 主题变量）。
+/* mdi2esm 渲染样式（自包含，不依赖 VitePress 主题变量）。
    由消费方经构建工具从 src 引入；如需主题化，覆盖 :root 下的 --vp-* 变量。 */
 
 :root {

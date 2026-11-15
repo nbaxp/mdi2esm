@@ -116,7 +116,7 @@ export async function createMarkdownComponent(source, dir, config, { frontmatter
     const def = await createScriptModule(scripts, dir, config);
     if (def) mergeScriptOptions(options, def);
   } catch (err) {
-    console.warn('[markdown-rt] <script> 选项合并失败：', err);
+    console.warn('[mdi2esm] <script> 选项合并失败：', err);
   }
   if (styles.length) {
     options.mixins = [styleMixin];
@@ -127,7 +127,7 @@ export async function createMarkdownComponent(source, dir, config, { frontmatter
     const setup = await createSetup(scripts, dir, frontmatter, params, config);
     if (setup) options.setup = setup;
   } catch (err) {
-    console.warn('[markdown-rt] <script setup> 执行失败：', err);
+    console.warn('[mdi2esm] <script setup> 执行失败：', err);
   }
   return { component: markRaw(defineComponent(options)), headings };
 }

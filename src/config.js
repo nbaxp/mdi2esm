@@ -1,5 +1,5 @@
 // Markdown 渲染配置：宿主壳是唯一注入点，渲染层只读 config，不猜宿主环境。
-// 与 mdoc 侧 utils/markdown-config.js 同 schema（此处为 esm 预设），阶段 2 抽包后合并为 markdown-rt/src/config.js。
+// 与 mdoc 侧 utils/markdown-config.js 同 schema（此处为 esm 预设），阶段 2 抽包后合并为 mdi2esm/src/config.js。
 
 // 容器提示文案：VitePress 官方 locales[].container 的中英文默认值
 export const CONTAINER_LABELS = {

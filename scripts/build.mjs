@@ -1,4 +1,4 @@
-// 用 Vite 8（rolldown 打包，依赖里无 esbuild）构建 markdown-rt。产出：
+// 用 Vite 8（rolldown 打包，依赖里无 esbuild）构建 mdi2esm。产出：
 //   dist/index.js      —— 完整打包版（未压缩，便于调试）
 //   dist/index.min.js  —— 完整打包版（压缩，供生产使用）
 //   dist/index.html    —— demo 页（包根 index.html 经 Vite 构建，自动 bundle 所有 peer，无需 importmap/vendor）
@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(here, '..'); // packages/markdown-rt
+const root = path.resolve(here, '..'); // packages/mdi2esm
 
 const dist = path.join(root, 'dist');
 fs.rmSync(dist, { recursive: true, force: true });
@@ -44,7 +44,7 @@ async function main() {
         rollupOptions: {
           external: isExternal,
           // 库产物须为单文件：禁用代码分割，内联所有动态 import（如 shiki-setup），
-          // 否则会拆出相对 chunk，消费方 import 'markdown-rt' 时拿不到。
+          // 否则会拆出相对 chunk，消费方 import 'mdi2esm' 时拿不到。
           output: { codeSplitting: false },
         },
       },

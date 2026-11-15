@@ -1,5 +1,5 @@
 // 共享渲染断言：只描述输入与期望，不 import 任何运行时实现。
-// 阶段 2 抽包后本文件可直接迁入 markdown-rt/tests/fixtures/，由 esm / mdoc 各自的薄壳调用。
+// 阶段 2 抽包后本文件可直接迁入 mdi2esm/tests/fixtures/，由 esm / mdoc 各自的薄壳调用。
 const fence = '```';
 const hashLink = `[跳](#${encodeURIComponent('章节 标题')})`;
 

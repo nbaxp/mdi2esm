@@ -1,4 +1,4 @@
-# markdown-rt
+# mdi2esm
 
 A markdown-it wrapper with common plugins integrated. It renders Markdown into VitePress-style HTML, with code highlighting, math (KaTeX), Mermaid diagrams, outlines and image zoom built in. The core markdown stack is bundled and ships as browser-native ESM; framework and heavy dependencies are left as peers for the host to provide.
 
@@ -19,33 +19,9 @@ npm i mdi2esm
 npm i mdi2esm vue vue-style-runtime shiki @shikijs/transformers katex mermaid medium-zoom
 ```
 
-## 两种用法
+## 用法
 
-### 1. 浏览器原生 ESM（import map）
-
-产物是单文件 ESM，内部对 peer 使用裸包名导入，用 import map 指到浏览器可访问的路径即可：
-
-```html
-<script type="importmap">
-  {
-    "imports": {
-      "vue": "/lib/vue/index.min.js",
-      "shiki": "/lib/shiki/index.min.js",
-      "katex": "/lib/katex/index.min.js",
-      "mermaid": "/lib/mermaid/index.min.js",
-      "medium-zoom": "/lib/medium-zoom/index.min.js",
-      "mdi2esm": "/lib/markdown-rt/index.min.js"
-    }
-  }
-</script>
-<script type="module">
-  import { renderMarkdown } from 'mdi2esm';
-  const { html } = renderMarkdown('# 你好');
-  document.body.innerHTML = html;
-</script>
-```
-
-### 2. 打包器（Vite / Rollup）
+打包器（Vite / Rollup）：
 
 ```js
 import { renderMarkdown, renderMath, buildOutline, createConfig } from 'mdi2esm';
@@ -60,11 +36,7 @@ const outline = buildOutline(headings);
 
 ## 样式
 
-渲染产物的类名沿用 VitePress 风格（`.vp-doc`、`.custom-block` 等），样式由源文件 `src/styles/markdown-rt.css` 提供。请从源码引入并自行主题化（覆盖 `:root` 下的 `--vp-*` 变量）：
-
-```js
-import 'mdi2esm/src/styles/markdown-rt.css'; // 需打包器支持
-```
+渲染产物的类名沿用 VitePress 风格（`.vp-doc`、`.custom-block` 等），本包不附带样式，需自行提供。
 
 KaTeX 的样式与字体属于 peer，由你安装的 `katex` 包提供，需自行引入：
 
@@ -85,14 +57,13 @@ import 'katex/dist/katex.min.css';
 - 浏览器脚本模块：`createScriptModule`、`createSetup`、`buildScriptModuleSource`、`buildSetupModuleSource`
 - Markdown 插件辅助：`anchorHref`、`normalizeHash`、`applyRestoreEntities`、`applyTablePlugin`、`applyLineNumbers`、`fenceMetaAttrs`、`escapeHtml`
 
-`renderMarkdown(source, { dir, config })` 返回 `{ html, headings }`；`renderMath(html, config)` 异步返回注入 KaTeX 后的 HTML；`buildOutline(headings)` 生成树形大纲。完整可运行示例见仓库根目录的 `index.html`（demo 页）。
+`renderMarkdown(source, { dir, config })` 返回 `{ html, headings }`；`renderMath(html, config)` 异步返回注入 KaTeX 后的 HTML；`buildOutline(headings)` 生成树形大纲。
 
 ## 开发
 
 ```sh
 npm install          # 安装依赖
-npm run build        # 构建 dist/index.js、dist/index.min.js 与 demo 页到 dist/
-npm run preview      # 预览 dist 里的 demo 页（vite preview）
+npm run build        # 构建 dist/index.js 与 dist/index.min.js
 npm run sync         # 把 src 同步到宿主 esm / mdoc 的 lib 副本（仓库内使用）
 npm test             # 运行 node:test 测试
 npm run lint         # eslint 检查（--max-warnings 0）

@@ -1,5 +1,5 @@
-// markdown-rt 公共 API：esm 与 mdoc 统一经 importmap 引用此包（浏览器），
-// node 测试则经各自前端 lib/markdown-rt 副本引用（以复用宿主 node_modules）。
+// mdi2esm 公共 API：esm 与 mdoc 统一经 importmap 引用此包（浏览器），
+// node 测试则经各自前端 lib/mdi2esm 副本引用（以复用宿主 node_modules）。
 export {
   CONTAINER_LABELS,
   COPY_LABELS,

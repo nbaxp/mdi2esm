@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>markdown-rt demo</title>
+    <title>mdi2esm demo</title>
     <!-- 完整打包版外部化框架与重依赖（vue / vue-style-runtime / katex / mermaid / medium-zoom / shiki /
          @shikijs/transformers），由消费方提供。本页由 Vite 构建（build.mjs）：
          以 dist/index.min.js 为依赖入口，Vite 自动解析这些裸包并 bundle 进 demo，无需 importmap/vendor。 -->
@@ -74,7 +74,7 @@
   </head>
   <body>
     <header>
-      <strong>markdown-rt</strong>
+      <strong>mdi2esm</strong>
       <span>完整打包版 demo（dist/index.min.js；外部 peer 由 Vite 构建时自动解析并 bundle）</span>
       <button id="render">渲染</button>
       <button id="toggle-theme">深色</button>
@@ -96,7 +96,7 @@
 
     <script type="module">
       // demo 样式走 src 源文件与 peer，由 Vite 构建时 bundle 进 assets，不依赖 dist 里的发布产物副本
-      import './src/styles/markdown-rt.css';
+      import './src/styles/mdi2esm.css';
       // katex 是 peer：CSS/字体由 katex 包提供，Vite 构建时解析并 bundle 进 assets
       import 'katex/dist/katex.min.css';
       import {
