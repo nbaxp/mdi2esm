@@ -1,7 +1,6 @@
 // Markdown → Vue 组件的完整管线（移植自 mdoc 的解析方式）
 // markdown → template 字符串 → Vue 运行时编译；Shiki/KaTeX 异步增强在编译前完成
 import { compile, defineComponent, markRaw } from 'vue';
-import { styleMixin } from 'vue-style-runtime';
 
 import { maskFenceMarkers, unmaskFenceMarkers } from './code-block.js';
 import { stripFrontmatter } from './frontmatter.js';
@@ -13,7 +12,24 @@ import { mountMermaid } from './mermaid.js';
 import { escapeInvalidInterpolations, renderMarkdown } from './render.js';
 import VPBadge from './VPBadge.js';
 
-// 剥离第一个顶级的 <script>（页面级脚本，围栏内的不动），style 块全部剥离经 styleMixin 注入组件。
+// 已注入的 <style> 内容（去重，避免重复挂载同一文档时反复插 <style>）
+const injectedStyles = new Set();
+
+// md 里的 <style> 块原样注入 <head>；scoped 语义由宿主构建工具负责，这里不做运行时隔离。
+function injectDocumentStyles(styles) {
+  if (typeof document === 'undefined') return;
+  for (const item of styles) {
+    const css = item.content.trim();
+    if (!css || injectedStyles.has(css)) continue;
+    injectedStyles.add(css);
+    const el = document.createElement('style');
+    el.setAttribute('data-mdi2esm-md-style', '');
+    el.textContent = css;
+    document.head.appendChild(el);
+  }
+}
+
+// 剥离第一个顶级的 <script>（页面级脚本，围栏内的不动），style 块全部剥离后在 mounted 时注入 <head>。
 // 页面级脚本只会有一个：其后正文里出现的 <script> 属于文档内容，原样保留不剥离。
 // <script setup> 拼成 ESM 模块执行（见 ./markdown-script.js），普通 <script> 默认导出并入组件选项。
 export function extractTopLevelBlocks(raw) {
@@ -107,6 +123,7 @@ export async function createMarkdownComponent(source, dir, config, { frontmatter
     components: { Badge: VPBadge, ClientOnly: { template: '<slot />' } },
     // mermaid 图形在挂载后写入真实 DOM，避免 Vue 编译丢弃 SVG 内的 <style>
     mounted() {
+      injectDocumentStyles(styles);
       mountMermaid().catch(() => {});
       mountImageZoom().catch(() => {});
     },
@@ -117,10 +134,6 @@ export async function createMarkdownComponent(source, dir, config, { frontmatter
     if (def) mergeScriptOptions(options, def);
   } catch (err) {
     console.warn('[mdi2esm] <script> 选项合并失败：', err);
-  }
-  if (styles.length) {
-    options.mixins = [styleMixin];
-    options.styles = styles.map((item) => `<style${item.attrs}>${item.content}</style>`).join('\n');
   }
   // <script setup>：拼成 ESM 模块执行，导出的绑定可直接在正文模板里使用；失败降级为无脚本渲染
   try {

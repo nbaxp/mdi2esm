@@ -31,4 +31,4 @@ export { renderMath } from './math.js';
 export { mountMermaid } from './mermaid.js';
 export { createMarkdownComponent, extractTopLevelBlocks } from './pipeline.js';
 export { buildOutline, escapeInvalidInterpolations, renderMarkdown, resolvePath } from './render.js';
-export { default as VPBadge } from './VPBadge.js';
+export { badgeStyles, default as VPBadge } from './VPBadge.js';

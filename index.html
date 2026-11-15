@@ -121,7 +121,12 @@
       import { createApp, h } from 'vue';
       // 独立 md 源文件，作为可编辑示例的初始值
       import sample from './demo/sample.md?raw';
-      import { buildOutline, createConfig, createMarkdownComponent } from './dist/index.min.js';
+      import { badgeStyles, buildOutline, createConfig, createMarkdownComponent } from './dist/index.min.js';
+
+      // 徽标样式由宿主注入（组件本身不注入）；用 <Badge> 前注入一次即可
+      const badgeStyleEl = document.createElement('style');
+      badgeStyleEl.textContent = badgeStyles;
+      document.head.appendChild(badgeStyleEl);
 
       const ta = document.getElementById('src');
       const outline = document.getElementById('outline');

@@ -16,7 +16,7 @@ npm i mdi2esm
 同时安装 peer 依赖（用到哪些功能装哪些；完整能力需要全部）：
 
 ```sh
-npm i mdi2esm vue vue-style-runtime shiki @shikijs/transformers katex mermaid medium-zoom
+npm i mdi2esm vue shiki @shikijs/transformers katex mermaid medium-zoom
 ```
 
 ## 用法
@@ -37,6 +37,16 @@ const outline = buildOutline(headings);
 ## 样式
 
 渲染产物的类名沿用 VitePress 风格（`.vp-doc`、`.custom-block` 等），本包不附带样式，需自行提供。
+
+Markdown 里用 `<Badge>` 时，徽标样式需由宿主全局注入一次（组件本身不注入样式）：
+
+```js
+import { badgeStyles } from 'mdi2esm';
+
+const el = document.createElement('style');
+el.textContent = badgeStyles;
+document.head.appendChild(el);
+```
 
 KaTeX 的样式与字体属于 peer，由你安装的 `katex` 包提供，需自行引入：
 

@@ -1,5 +1,3 @@
-import styleMixin from 'vue-style-runtime';
-
 const BADGE_CSS = `
 .VPBadge {
   display: inline-block;
@@ -92,9 +90,8 @@ const BADGE_CSS = `
 
 // 1:1 移植 VitePress VPBadge.vue；Markdown 里的 <Badge> 由动态组件注册为 Badge，
 // 原版：https://github.com/vuejs/vitepress/blob/v2.0.0-alpha.21/src/client/theme-default/components/VPBadge.vue
-// badgeStyles 供入口按需全局注入一次，保证徽标在页面模板里也有样式。
+// 组件本身不注入样式；BADGE_CSS 由 badgeStyles 导出，宿主全局注入一次即可（见 README）。
 const VPBadge = {
-  mixins: [styleMixin],
   props: {
     text: { type: String, required: false },
     type: { type: String, required: false, default: 'tip' },
@@ -104,9 +101,6 @@ const VPBadge = {
       <slot>{{ text }}</slot>
     </span>
   `,
-  styles: /* HTML */ `<style scoped>
-    ${BADGE_CSS}
-  </style>`,
 };
 
 const badgeStyles = BADGE_CSS;
