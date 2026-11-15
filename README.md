@@ -10,13 +10,13 @@ A markdown-it wrapper with common plugins integrated. It renders Markdown into V
 ## 安装
 
 ```sh
-npm i markdown-rt
+npm i mdi2esm
 ```
 
 同时安装 peer 依赖（用到哪些功能装哪些；完整能力需要全部）：
 
 ```sh
-npm i markdown-rt vue vue-style-runtime shiki @shikijs/transformers katex mermaid medium-zoom
+npm i mdi2esm vue vue-style-runtime shiki @shikijs/transformers katex mermaid medium-zoom
 ```
 
 ## 两种用法
@@ -34,12 +34,12 @@ npm i markdown-rt vue vue-style-runtime shiki @shikijs/transformers katex mermai
       "katex": "/lib/katex/index.min.js",
       "mermaid": "/lib/mermaid/index.min.js",
       "medium-zoom": "/lib/medium-zoom/index.min.js",
-      "markdown-rt": "/lib/markdown-rt/index.min.js"
+      "mdi2esm": "/lib/markdown-rt/index.min.js"
     }
   }
 </script>
 <script type="module">
-  import { renderMarkdown } from 'markdown-rt';
+  import { renderMarkdown } from 'mdi2esm';
   const { html } = renderMarkdown('# 你好');
   document.body.innerHTML = html;
 </script>
@@ -48,7 +48,7 @@ npm i markdown-rt vue vue-style-runtime shiki @shikijs/transformers katex mermai
 ### 2. 打包器（Vite / Rollup）
 
 ```js
-import { renderMarkdown, renderMath, buildOutline, createConfig } from 'markdown-rt';
+import { renderMarkdown, renderMath, buildOutline, createConfig } from 'mdi2esm';
 
 const config = createConfig();
 const { html, headings } = renderMarkdown('# 标题\n正文', { config });
@@ -56,14 +56,14 @@ const finalHtml = await renderMath(html, config);
 const outline = buildOutline(headings);
 ```
 
-`package.json` 的 `exports` 提供两个入口：默认（生产）指向压缩版 `dist/index.min.js`，`development` 条件指向未压缩的 `dist/index.js`；也可显式用 `markdown-rt/index` 与 `markdown-rt/index.min`。
+`package.json` 的 `exports` 提供两个入口：默认（生产）指向压缩版 `dist/index.min.js`，`development` 条件指向未压缩的 `dist/index.js`；也可显式用 `mdi2esm/index` 与 `mdi2esm/index.min`。
 
 ## 样式
 
 渲染产物的类名沿用 VitePress 风格（`.vp-doc`、`.custom-block` 等），样式由源文件 `src/styles/markdown-rt.css` 提供。请从源码引入并自行主题化（覆盖 `:root` 下的 `--vp-*` 变量）：
 
 ```js
-import 'markdown-rt/src/styles/markdown-rt.css'; // 需打包器支持
+import 'mdi2esm/src/styles/markdown-rt.css'; // 需打包器支持
 ```
 
 KaTeX 的样式与字体属于 peer，由你安装的 `katex` 包提供，需自行引入：
@@ -103,7 +103,7 @@ npm run lint:fix     # eslint 自动修复
 
 ## 发布说明
 
-`package.json` 中的 `repository` / `homepage` / `bugs` 指向 `https://github.com/nbaxp/markdown-rt`。
+`package.json` 中的 `repository` / `homepage` / `bugs` 指向 `https://github.com/nbaxp/mdi2esm`。
 
 发布由 `.github/workflows/publish.yml` 承载：推送 `v*` Tag 时校验 Tag 与 `package.json` 版本一致，执行测试与 lint、构建、`npm pack`、`npm publish <tgz>`（npm OIDC Trusted Publisher，需在 npm 侧配置 GitHub Actions 为 Trusted Publisher）并创建 GitHub Release；手动触发默认只做 `npm publish --dry-run`，正式手动发布需选择 `v*` Tag 并将 `dry_run` 设为 `false`。
 

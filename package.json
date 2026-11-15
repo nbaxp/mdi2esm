@@ -1,5 +1,5 @@
 {
-  "name": "markdown-rt",
+  "name": "mdi2esm",
   "version": "0.1.1",
   "description": "A markdown-it wrapper with common plugins integrated: containers, footnotes, task lists, anchors, code highlighting, KaTeX math, Mermaid diagrams and outlines, shipped as browser-native ESM.",
   "type": "module",
@@ -17,11 +17,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nbaxp/markdown-rt.git"
+    "url": "git+https://github.com/nbaxp/mdi2esm.git"
   },
-  "homepage": "https://github.com/nbaxp/markdown-rt#readme",
+  "homepage": "https://github.com/nbaxp/mdi2esm#readme",
   "bugs": {
-    "url": "https://github.com/nbaxp/markdown-rt/issues"
+    "url": "https://github.com/nbaxp/mdi2esm/issues"
   },
   "module": "./dist/index.min.js",
   "main": "./dist/index.min.js",
