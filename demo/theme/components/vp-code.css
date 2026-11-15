@@ -1,0 +1,16 @@
+/* 原版：https://github.com/vuejs/vitepress/blob/v2.0.0-alpha.21/src/client/theme-default/styles/components/vp-code.css */
+.dark .shiki span {
+  color: var(--shiki-dark, inherit);
+  text-decoration: var(--shiki-dark-text-decoration, inherit);
+  font-weight: var(--shiki-dark-font-weight, inherit);
+}
+
+html:not(.dark) .shiki span {
+  color: var(--shiki-light, inherit);
+  text-decoration: var(--shiki-light-text-decoration, inherit);
+  font-weight: var(--shiki-light-font-weight, inherit);
+}
+
+.shiki span {
+  unicode-bidi: isolate;
+}

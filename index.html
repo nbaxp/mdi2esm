@@ -7,92 +7,78 @@
     <!--
       全面 demo：示例源来自独立的 demo/sample.md（?raw 载入，可实时编辑）。
       渲染走 createMarkdownComponent 完整管线（含 frontmatter、Shiki 高亮、KaTeX、Badge、script setup），
-      由 Vue createApp 挂载。本页由 Vite 构建（build.mjs）：以 dist/index.min.js 为库入口，
-      Vue / katex / mermaid / shiki 等 peer 由 Vite 从本包 node_modules 解析并 bundle。
+      由 Vue createApp 挂载。样式复用 mdoc 的 VitePress 拷贝（demo/theme），
+      确保代码块着色 / 容器 / 排版 / 深浅主题与 mdoc 真实一致。
     -->
     <style>
-      :root {
-        --vp-c-text-1: #1f2328;
-        --vp-c-text-2: #656d76;
-        --vp-c-bg: #ffffff;
-        --vp-c-bg-soft: #f6f8fa;
-        --vp-c-bg-alt: #f6f8fa;
-        --vp-c-divider: #d0d7de;
-        --vp-c-border: #d0d7de;
-        --vp-c-brand-1: #3451b2;
-      }
-      html.dark {
-        --vp-c-text-1: #e6edf3;
-        --vp-c-text-2: #9198a1;
-        --vp-c-bg: #1b1b1f;
-        --vp-c-bg-soft: #252529;
-        --vp-c-bg-alt: #252529;
-        --vp-c-divider: #3a3a3f;
-        --vp-c-border: #3a3a3f;
-        --vp-c-brand-1: #a8b1ff;
-      }
+      /* demo 外壳专用样式（demo- 前缀，避免与 VitePress 全局样式冲突） */
       body {
-        margin: 0;
-        font-family:
-          system-ui,
-          -apple-system,
-          sans-serif;
-        color: var(--vp-c-text-1);
         background: var(--vp-c-bg);
       }
-      header {
+      .demo-header {
         padding: 12px 20px;
         border-bottom: 1px solid var(--vp-c-divider);
         display: flex;
         gap: 12px;
         align-items: center;
+        position: sticky;
+        top: 0;
+        background: var(--vp-c-bg);
+        z-index: 10;
       }
-      header span {
+      .demo-header strong {
+        font-size: 16px;
+      }
+      .demo-header span {
         color: var(--vp-c-text-2);
         font-size: 13px;
       }
-      button {
+      .demo-header button {
         border: 1px solid var(--vp-c-divider);
         background: var(--vp-c-bg-soft);
         color: var(--vp-c-text-1);
         border-radius: 6px;
         padding: 4px 12px;
         cursor: pointer;
+        font-size: 13px;
       }
-      main {
+      .demo-main {
         display: grid;
         grid-template-columns: 1fr 1fr 220px;
         gap: 16px;
         padding: 16px 20px;
         align-items: start;
       }
-      textarea {
+      .demo-src {
         width: 100%;
         height: 78vh;
         box-sizing: border-box;
-        font-family: ui-monospace, monospace;
+        font-family: var(--vp-font-family-mono);
         font-size: 12px;
-        line-height: 1.5;
+        line-height: 1.6;
         border: 1px solid var(--vp-c-divider);
         border-radius: 8px;
         padding: 12px;
         background: var(--vp-c-bg-soft);
         color: var(--vp-c-text-1);
         resize: vertical;
+        tab-size: 2;
       }
-      .rendered {
-        border: 1px solid var(--vp-c-divider);
-        border-radius: 8px;
-        padding: 0 16px 16px;
-        overflow: auto;
-        height: 78vh;
-      }
-      .col-title {
+      .demo-col-title {
         font-size: 12px;
         text-transform: uppercase;
         letter-spacing: 0.04em;
         color: var(--vp-c-text-2);
         margin: 0 0 6px;
+      }
+      .demo-rendered {
+        border: 1px solid var(--vp-c-divider);
+        border-radius: 8px;
+        padding: 0 20px 20px;
+        overflow: auto;
+        height: 78vh;
+        background: var(--vp-c-bg);
+        color: var(--vp-c-text-1);
       }
       #outline a {
         display: block;
@@ -104,134 +90,33 @@
       #outline a:hover {
         color: var(--vp-c-brand-1);
       }
-      /* VitePress 官方近似样式：demo 不发布 CSS，这里内联让所有能力可见 */
-      .vp-doc .header-anchor {
-        opacity: 0;
-        margin-left: 8px;
-        text-decoration: none;
-      }
-      .vp-doc h2:hover .header-anchor,
-      .vp-doc h3:hover .header-anchor {
-        opacity: 1;
-      }
-      .vp-doc .header-anchor::before {
-        content: '#';
-        color: var(--vp-c-brand-1);
-      }
-      .vp-doc .table-of-contents {
-        border: 1px solid var(--vp-c-divider);
-        border-radius: 8px;
-        padding: 8px 16px;
-        background: var(--vp-c-bg-soft);
-      }
-      .vp-doc .table-of-contents ul {
-        margin: 4px 0;
-        padding-left: 20px;
-      }
-      .vp-doc .custom-block {
-        margin: 16px 0;
-        padding: 12px 16px;
-        border-radius: 8px;
-        border-left: 4px solid var(--vp-c-brand-1);
-        background: var(--vp-c-bg-soft);
-      }
-      .vp-doc .custom-block.tip,
-      .vp-doc .custom-block.info {
-        border-left-color: #42b883;
-      }
-      .vp-doc .custom-block.warning,
-      .vp-doc .custom-block.caution {
-        border-left-color: #e7b100;
-      }
-      .vp-doc .custom-block.danger {
-        border-left-color: #e34c4c;
-      }
-      .vp-doc .custom-block .custom-block-title {
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      .vp-doc .VPBadge {
-        display: inline-block;
-        border-radius: 0.75rem;
-        padding: 0 0.5rem;
-        font-size: 0.75rem;
-        font-weight: 500;
-        line-height: 1.6;
-        color: #fff;
-        background: #42b883;
-      }
-      .vp-doc .VPBadge.warning {
-        background: #e7b100;
-      }
-      .vp-doc .VPBadge.danger {
-        background: #e34c4c;
-      }
-      .vp-doc .vp-code-group {
-        margin: 16px 0;
-        border: 1px solid var(--vp-c-divider);
-        border-radius: 8px;
-        overflow: hidden;
-      }
-      .vp-doc .vp-code-group .tabs {
-        display: flex;
-        gap: 4px;
-        padding: 8px;
-        background: var(--vp-c-bg-soft);
-      }
-      .vp-doc .vp-code-group .tabs input {
-        display: none;
-      }
-      .vp-doc .vp-code-group .tabs label {
-        cursor: pointer;
-        padding: 2px 10px;
-        border-radius: 4px;
-        font-size: 12px;
-      }
-      .vp-doc .vp-code-group .blocks > div {
-        display: none;
-      }
-      .vp-doc .vp-code-group .blocks > div.active {
-        display: block;
-      }
-      .vp-doc img {
-        max-width: 100%;
-      }
-      .vp-doc table {
-        border-collapse: collapse;
-        margin: 16px 0;
-      }
-      .vp-doc th,
-      .vp-doc td {
-        border: 1px solid var(--vp-c-divider);
-        padding: 6px 12px;
-      }
     </style>
   </head>
   <body>
-    <header>
+    <header class="demo-header">
       <strong>mdi2esm</strong>
       <span>全面 demo · 独立 md 源 · 完整渲染管线</span>
       <button id="render">渲染</button>
       <button id="toggle-theme">深色</button>
     </header>
-    <main>
+    <main class="demo-main">
       <section>
-        <p class="col-title">Markdown 源（demo/sample.md）</p>
-        <textarea id="src" spellcheck="false"></textarea>
+        <p class="demo-col-title">Markdown 源（demo/sample.md）</p>
+        <textarea id="src" class="demo-src" spellcheck="false"></textarea>
       </section>
       <section>
-        <p class="col-title">渲染结果</p>
-        <div id="content" class="rendered vp-doc"></div>
+        <p class="demo-col-title">渲染结果</p>
+        <div id="content" class="demo-rendered vp-doc"></div>
       </section>
       <aside>
-        <p class="col-title">大纲</p>
+        <p class="demo-col-title">大纲</p>
         <nav id="outline"></nav>
       </aside>
     </main>
 
     <script type="module">
-      // 样式源文件由 Vite 打包进 assets
-      import './src/styles/mdi2esm.css';
+      // 完整 VitePress 样式（mdoc 拷贝）+ KaTeX 样式，由 Vite 打包进 assets
+      import './demo/theme/index.css';
       import 'katex/dist/katex.min.css';
       import { createApp, h } from 'vue';
       // 独立 md 源文件，作为可编辑示例的初始值
