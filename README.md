@@ -76,10 +76,19 @@ npm run lint:fix     # eslint 自动修复
 
 `package.json` 中的 `repository` / `homepage` / `bugs` 指向 `https://github.com/nbaxp/mdi2esm`。
 
-发布由 `.github/workflows/publish.yml` 承载：推送 `v*` Tag 时校验 Tag 与 `package.json` 版本一致，执行测试与 lint、构建、`npm pack`、`npm publish <tgz>`（npm OIDC Trusted Publisher，需在 npm 侧配置 GitHub Actions 为 Trusted Publisher）并创建 GitHub Release；手动触发默认只做 `npm publish --dry-run`，正式手动发布需选择 `v*` Tag 并将 `dry_run` 设为 `false`。
+发布由 `.github/workflows/publish.yml` 承载：推送 `v*` Tag（或手动选择 `v*` Tag 且 `dry_run=false`）时，校验 Tag 与 `package.json` 版本一致，执行测试、lint、构建、`npm pack`、`npm publish <tgz>` 并创建 GitHub Release；手动触发默认只做 `npm publish --dry-run`。`dist` 被 gitignore、由 `npm run build` 生成，无需提交。
 
-发版步骤：
+### 首次发布（新包）
+
+CI 的 `npm publish` 走 OIDC Trusted Publisher，但**新包尚未发布时，npm 侧没有 Settings 页面，无法预先配置 Trusted Publisher**。因此首次推 Tag 会在 Publish 步骤返回 `404 Not Found`（不是包内容问题，前面测试/lint/build/pack 都会通过）。首次发布须按顺序：
+
+1. 本地构建并打包：`npm run build && npm pack`，得到 `mdi2esm-<version>.tgz`。
+2. 本地用 2FA OTP 发首版：`npm publish mdi2esm-<version>.tgz --access public --otp=<OTP>`。
+3. 包发布后，到 https://www.npmjs.com/package/mdi2esm/settings/access → Trusted Publisher → GitHub Actions，填 owner `nbaxp`、repo `mdi2esm`、workflow `publish.yml` 保存。
+4. 之后推 `v*` Tag 即可由 CI 用 OIDC 自动发布，无需 OTP。
+
+### 后续发版
 
 1. 确认 `npm test`、`npm run lint` 全过。
-2. 更新 `package.json` 的 `version`（如 `npm version patch` / `minor` / `major`）。
-3. 提交并打同名 Tag（`v0.1.1` 形式）推送，工作流自动完成构建、发布与 Release。
+2. `npm version patch` / `minor` / `major` 更新版本并打同名 Tag（如 `v0.1.2`）。
+3. 提交改动、推送 `main` 与 Tag；工作流自动完成构建、发布与 Release。

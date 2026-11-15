@@ -10,6 +10,12 @@
 # npm 包 Settings → Trusted Publisher → GitHub Actions
 # 配置仓库、工作流文件名 publish.yml。
 #
+# 首次发布（新包）：npm 上新包尚无 Settings 页面可配 Trusted Publisher，
+# 首次推 Tag 会在 Publish 步骤返回 404（OIDC 无授权）。须先本地发首版：
+#   npm run build && npm pack
+#   npm publish mdi2esm-<version>.tgz --access public --otp=<OTP>
+# 再到 npm 包 Settings 配好 Trusted Publisher，之后推 Tag 才能由 CI 自动发布。
+#
 # 权限：
 # id-token: write 用于 npm OIDC。
 # contents: write 用于创建 GitHub Release。
