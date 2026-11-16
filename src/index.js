@@ -15,6 +15,7 @@ export { ensureCustomContainers, default as md, render as renderSource } from '.
 export { applyCodeBlock, maskFenceMarkers, unmaskFenceMarkers } from './code-block.js';
 export { stripFrontmatter } from './frontmatter.js';
 export { highlightCode, normalizeLang } from './highlight.js';
+export { highlightBlock } from './highlight-block.js';
 export { Icon, registerIcon, registerIconCollection } from './icons.js';
 export { mountImageZoom } from './image-zoom.js';
 export { default } from './markdown-it.js';
@@ -32,3 +33,5 @@ export { renderMath } from './math.js';
 export { mountMermaid } from './mermaid.js';
 export { createMarkdownComponent, extractTopLevelBlocks } from './pipeline.js';
 export { buildOutline, escapeInvalidInterpolations, renderMarkdown, resolvePath } from './render.js';
+// Prism 本体：宿主需要注册额外语法或直接用 Prism.highlight 时使用
+export { default as Prism } from 'prismjs';

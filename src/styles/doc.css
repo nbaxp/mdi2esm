@@ -971,121 +971,121 @@
   background-color: var(--vp-code-line-highlight-color, rgba(127, 127, 127, 0.12));
 }
 
-.vp-doc .token.comment,
-.vp-doc .token.prolog,
-.vp-doc .token.doctype,
-.vp-doc .token.cdata {
+:is(.vp-doc, .mdi-code) .token.comment,
+:is(.vp-doc, .mdi-code) .token.prolog,
+:is(.vp-doc, .mdi-code) .token.doctype,
+:is(.vp-doc, .mdi-code) .token.cdata {
   color: #6a737d;
 }
 
-.vp-doc .token.punctuation {
+:is(.vp-doc, .mdi-code) .token.punctuation {
   color: #24292f;
 }
 
-.vp-doc .token.namespace {
+:is(.vp-doc, .mdi-code) .token.namespace {
   opacity: 0.7;
 }
 
-.vp-doc .token.property,
-.vp-doc .token.tag,
-.vp-doc .token.boolean,
-.vp-doc .token.number,
-.vp-doc .token.constant,
-.vp-doc .token.symbol,
-.vp-doc .token.deleted {
+:is(.vp-doc, .mdi-code) .token.property,
+:is(.vp-doc, .mdi-code) .token.tag,
+:is(.vp-doc, .mdi-code) .token.boolean,
+:is(.vp-doc, .mdi-code) .token.number,
+:is(.vp-doc, .mdi-code) .token.constant,
+:is(.vp-doc, .mdi-code) .token.symbol,
+:is(.vp-doc, .mdi-code) .token.deleted {
   color: #005cc5;
 }
 
-.vp-doc .token.selector,
-.vp-doc .token.attr-name,
-.vp-doc .token.string,
-.vp-doc .token.char,
-.vp-doc .token.builtin,
-.vp-doc .token.inserted {
+:is(.vp-doc, .mdi-code) .token.selector,
+:is(.vp-doc, .mdi-code) .token.attr-name,
+:is(.vp-doc, .mdi-code) .token.string,
+:is(.vp-doc, .mdi-code) .token.char,
+:is(.vp-doc, .mdi-code) .token.builtin,
+:is(.vp-doc, .mdi-code) .token.inserted {
   color: #032f62;
 }
 
-.vp-doc .token.operator,
-.vp-doc .token.entity,
-.vp-doc .token.url {
+:is(.vp-doc, .mdi-code) .token.operator,
+:is(.vp-doc, .mdi-code) .token.entity,
+:is(.vp-doc, .mdi-code) .token.url {
   color: #d73a49;
 }
 
-.vp-doc .token.atrule,
-.vp-doc .token.attr-value,
-.vp-doc .token.keyword {
+:is(.vp-doc, .mdi-code) .token.atrule,
+:is(.vp-doc, .mdi-code) .token.attr-value,
+:is(.vp-doc, .mdi-code) .token.keyword {
   color: #d73a49;
 }
 
-.vp-doc .token.function,
-.vp-doc .token.class-name {
+:is(.vp-doc, .mdi-code) .token.function,
+:is(.vp-doc, .mdi-code) .token.class-name {
   color: #6f42c1;
 }
 
-.vp-doc .token.regex,
-.vp-doc .token.important,
-.vp-doc .token.variable {
+:is(.vp-doc, .mdi-code) .token.regex,
+:is(.vp-doc, .mdi-code) .token.important,
+:is(.vp-doc, .mdi-code) .token.variable {
   color: #e36209;
 }
 
-.dark .vp-doc .token.comment,
-.dark .vp-doc .token.prolog,
-.dark .vp-doc .token.doctype,
-.dark .vp-doc .token.cdata {
+.dark :is(.vp-doc, .mdi-code) .token.comment,
+.dark :is(.vp-doc, .mdi-code) .token.prolog,
+.dark :is(.vp-doc, .mdi-code) .token.doctype,
+.dark :is(.vp-doc, .mdi-code) .token.cdata {
   color: #8b949e;
 }
 
-.dark .vp-doc .token.punctuation {
+.dark :is(.vp-doc, .mdi-code) .token.punctuation {
   color: #c9d1d9;
 }
 
-.dark .vp-doc .token.property,
-.dark .vp-doc .token.tag,
-.dark .vp-doc .token.boolean,
-.dark .vp-doc .token.number,
-.dark .vp-doc .token.constant,
-.dark .vp-doc .token.symbol,
-.dark .vp-doc .token.deleted {
+.dark :is(.vp-doc, .mdi-code) .token.property,
+.dark :is(.vp-doc, .mdi-code) .token.tag,
+.dark :is(.vp-doc, .mdi-code) .token.boolean,
+.dark :is(.vp-doc, .mdi-code) .token.number,
+.dark :is(.vp-doc, .mdi-code) .token.constant,
+.dark :is(.vp-doc, .mdi-code) .token.symbol,
+.dark :is(.vp-doc, .mdi-code) .token.deleted {
   color: #79c0ff;
 }
 
-.dark .vp-doc .token.selector,
-.dark .vp-doc .token.attr-name,
-.dark .vp-doc .token.string,
-.dark .vp-doc .token.char,
-.dark .vp-doc .token.builtin,
-.dark .vp-doc .token.inserted {
+.dark :is(.vp-doc, .mdi-code) .token.selector,
+.dark :is(.vp-doc, .mdi-code) .token.attr-name,
+.dark :is(.vp-doc, .mdi-code) .token.string,
+.dark :is(.vp-doc, .mdi-code) .token.char,
+.dark :is(.vp-doc, .mdi-code) .token.builtin,
+.dark :is(.vp-doc, .mdi-code) .token.inserted {
   color: #a5d6ff;
 }
 
-.dark .vp-doc .token.operator,
-.dark .vp-doc .token.entity,
-.dark .vp-doc .token.url {
+.dark :is(.vp-doc, .mdi-code) .token.operator,
+.dark :is(.vp-doc, .mdi-code) .token.entity,
+.dark :is(.vp-doc, .mdi-code) .token.url {
   color: #ff7b72;
 }
 
-.dark .vp-doc .token.atrule,
-.dark .vp-doc .token.attr-value,
-.dark .vp-doc .token.keyword {
+.dark :is(.vp-doc, .mdi-code) .token.atrule,
+.dark :is(.vp-doc, .mdi-code) .token.attr-value,
+.dark :is(.vp-doc, .mdi-code) .token.keyword {
   color: #ff7b72;
 }
 
-.dark .vp-doc .token.function,
-.dark .vp-doc .token.class-name {
+.dark :is(.vp-doc, .mdi-code) .token.function,
+.dark :is(.vp-doc, .mdi-code) .token.class-name {
   color: #d2a8ff;
 }
 
-.dark .vp-doc .token.regex,
-.dark .vp-doc .token.important,
-.dark .vp-doc .token.variable {
+.dark :is(.vp-doc, .mdi-code) .token.regex,
+.dark :is(.vp-doc, .mdi-code) .token.important,
+.dark :is(.vp-doc, .mdi-code) .token.variable {
   color: #ffa657;
 }
 
-.vp-doc .token.bold {
+:is(.vp-doc, .mdi-code) .token.bold {
   font-weight: 700;
 }
 
-.vp-doc .token.italic {
+:is(.vp-doc, .mdi-code) .token.italic {
   font-style: italic;
 }
 

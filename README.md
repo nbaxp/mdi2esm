@@ -110,13 +110,31 @@ resolve: { alias: { '@iconify/vue': path.resolve('node_modules/@iconify/vue') } 
 - 配置：`createConfig`、`createEsmAdapters`、`createMdocAdapters`、`DEFAULT_CONFIG`、`DEFAULT_ADAPTERS`、`CONTAINER_LABELS`、`COPY_LABELS`
 - 渲染环境：`createRenderEnv`
 - 渲染：`renderMarkdown`、`renderSource`、`renderMath`、`md`（markdown-it 实例）、`ensureCustomContainers`、`buildOutline`、`escapeInvalidInterpolations`、`resolvePath`
-- 代码块：`applyCodeBlock`、`maskFenceMarkers`、`unmaskFenceMarkers`、`highlightCode`、`normalizeLang`
+- 代码块：`applyCodeBlock`、`maskFenceMarkers`、`unmaskFenceMarkers`、`highlightCode`、`highlightBlock`、`normalizeLang`、`Prism`
 - 管线：`createMarkdownComponent`、`extractTopLevelBlocks`
 - 其它：`stripFrontmatter`、`mountImageZoom`、`mountMermaid`
 - 浏览器脚本模块：`createScriptModule`、`createSetup`、`buildScriptModuleSource`、`buildSetupModuleSource`
 - Markdown 插件辅助：`anchorHref`、`normalizeHash`、`applyRestoreEntities`、`applyTablePlugin`、`applyLineNumbers`、`fenceMetaAttrs`、`escapeHtml`
 
 `renderMarkdown(source, { dir, config })` 返回 `{ html, headings }`；`renderMath(html, config)` 异步返回注入 KaTeX 后的 HTML；`buildOutline(headings)` 生成树形大纲。
+
+## 独立代码块
+
+不在 markdown 内、由宿主组件自行渲染代码时，直接用 `highlightBlock`，与正文代码块共用同一套 Prism 语法与行切分：
+
+```js
+import { highlightBlock } from 'mdi2esm';
+
+const { html, lang, ok } = highlightBlock(code, 'ts', { meta: '{2,4-5}' });
+// html: <pre class="language-ts"><code><span class="line">…</span></code></pre>
+// ok: false 表示语言未注册，内容已转义为纯文本
+```
+
+配套约定：
+
+1. 宿主容器加 `mdi-code` 类，token 配色才会生效（`index.css` 里的规则是 `:is(.vp-doc, .mdi-code) .token`，深色走 `.dark`）。
+2. 行号、折行、最大高度等布局由宿主控制；`html` 里每行已包好 `.line`，行号用 `counter` 实现即可。
+3. 需要注册额外语言或直接用 `Prism.highlight` 时，用导出的 `Prism`：`Prism.languages.demo = {…}`。
 
 ## 开发
 
