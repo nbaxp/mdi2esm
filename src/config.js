@@ -40,9 +40,9 @@ export const DEFAULT_CONFIG = {
   libPath: '/lib/',
   docRoot: '/',
   themeBase: '/',
-  // 图标组件：true = 内置异步 Icon，false = 不注册（用宿主全局 Icon），
-  // 对象/函数 = 直接用该组件定义
-  icons: true,
+  // 图标组件：默认 false = 不注册，`<Icon>` 走宿主全局注册（推荐）；
+  // true = 用包内异步 Icon；对象/函数 = 直接用该组件定义
+  icons: false,
   markdown: { lineNumbers: false, math: true, container: [] },
 };
 

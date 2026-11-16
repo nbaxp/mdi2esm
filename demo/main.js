@@ -3,6 +3,8 @@ import '../src/styles/index.css';
 import 'katex/dist/katex.min.css';
 import './demo.css';
 
+// 图标组件由宿主提供：包内不再默认注册 <Icon>，这里演示宿主自己的接入方式
+import { Icon } from '@iconify/vue';
 import { createApp, h } from 'vue';
 
 import { buildOutline, createConfig, createMarkdownComponent, registerIconCollection } from '../dist/index.min.js';
@@ -129,6 +131,8 @@ async function run() {
       Badge: VPBadge,
     };
     app = createApp({ render: () => h(component) });
+    // 宿主全局注册 Icon：markdown 里的 <Icon> 才能渲染
+    app.component('Icon', Icon);
     app.mount(content);
   }
   outline.innerHTML = '';

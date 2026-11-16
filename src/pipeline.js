@@ -82,12 +82,13 @@ function mergeScriptOptions(options, def) {
   }
 }
 
-// 图标组件解析：默认用内置异步 Icon；icons: false 交给宿主全局注册；也可直接传组件定义
+// 图标组件解析：默认不注册，`<Icon>` 由宿主全局提供；
+// icons: true 用包内异步 Icon，传组件定义则直接使用
 function resolveIconComponent(config = {}) {
   const { icons } = config;
-  if (icons === false) return null;
+  if (icons === true) return Icon;
   if (icons && (typeof icons === 'object' || typeof icons === 'function')) return icons;
-  return Icon;
+  return null;
 }
 
 /**

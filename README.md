@@ -58,18 +58,29 @@ import 'katex/dist/katex.min.css';
 
 ## 图标（Iconify）
 
-正文里可以直接写 `<Icon>`，无需宿主注册组件：
+图标组件由宿主提供，包里不再默认注册 `<Icon>`。两行接入：
+
+```js
+import { Icon } from '@iconify/vue';
+
+app.component('Icon', Icon); // 之后 markdown 里的 <Icon> 即可渲染
+```
 
 ```md
 <Icon icon="logos:vite" width="24" height="24" />
 <Icon icon="lucide:rocket" />
 ```
 
-`@iconify/vue` 是可选 peer：页面真的渲染 `<Icon>` 时才动态 `import()`，未安装时不影响其他功能。包内不内置图标集，未注册的图标（以及没有 `addCollection` 注册的整个集合）由 Iconify 默认 API `api.iconify.design` 联网获取，离线、内网或无此图标时会留空。需要离线渲染时，宿主自行安装 `@iconify-json/*`，再调用本包的 `registerIconCollection()`（或直接 `addCollection()`）。
+这样做的原因：mdi2esm 不持有图标实例，就不会把「`@iconify/vue` 必须单实例」变成宿主的默认约束；宿主用哪个版本、哪个图标集完全自己决定。
 
-`Icon` 也从包入口导出，需要手动注册时可直接用。
+如果希望由包内代劳（纯 ESM 场景图省事），显式开启：
 
-调用时可以直接扩充本地图标集，离线可用：
+```js
+createConfig({ icons: true }); // 用包内的异步 Icon（动态 import('@iconify/vue')）
+createConfig({ icons: MyIcon }); // 或者直接指定组件
+```
+
+包内不内置图标集，未注册的图标由 Iconify 默认 API `api.iconify.design` 联网获取，离线、内网或无此图标时会留空。需要离线渲染时安装 `@iconify-json/*`，再调用本包的 `registerIconCollection()`（或直接 `addCollection()`）：
 
 ```js
 import { registerIconCollection, registerIcon } from 'mdi2esm';
@@ -79,16 +90,9 @@ await registerIconCollection(icons); // 整个集合
 await registerIcon('demo:spark', { body: '<path d="M12 2l9 9-9 9-9-9z"/>', width: 24, height: 24 });
 ```
 
-注册通过 `@iconify/vue` 的模块单例生效，所以只需保证宿主与 mdi2esm 解析到同一个 `@iconify/vue`（importmap 单条映射或打包器去重）。后注册也有效：Iconify 会通知已渲染的 `<Icon>` 重绘。
+`registerIconCollection` / `registerIcon` 内部按需 `import('@iconify/vue')`，同样解析到宿主自己那份实例，所以注册对宿主的 `<Icon>` 直接生效；后注册也有效，Iconify 会通知已渲染的图标重绘。
 
-如果不想共用实例，可以让宿主接管图标组件：
-
-```js
-createConfig({ icons: false }); // 不注册内置 Icon，由 app.component('Icon', ...) 提供
-createConfig({ icons: MyIcon }); // 直接换成指定组件
-```
-
-打包器场景需要显式去重，并保持它作为外部依赖（不要内联进 mdi2esm 的产物）：
+开启 `icons: true` 或使用注册助手时，需自行安装 `@iconify/vue`（可选 peer），并保证它作为外部依赖只保留一份，打包器场景要显式去重：
 
 ```js
 // Vite

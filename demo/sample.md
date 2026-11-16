@@ -227,7 +227,13 @@ Markdown 最终被编译成 Vue 模板，所以插值、指令和组件都能直
 
 ## 12.3 图标（Iconify）
 
-正文里可直接写 `<Icon>`：
+正文里可直接写 `<Icon>`，前提是宿主已把它注册为全局组件：
+
+```js
+import { Icon } from '@iconify/vue';
+
+app.component('Icon', Icon);
+```
 
 <Icon icon="logos:vite" width="28" height="28" />
 <Icon icon="skill-icons:typescript" width="28" height="28" />
@@ -236,7 +242,7 @@ Markdown 最终被编译成 Vue 模板，所以插值、指令和组件都能直
 
 前三个靠联网或宿主已注册的集合；最后一个 `demo:spark` 是 demo 启动时用 `registerIconCollection()` 本地注册的，离线也能显示。
 
-`@iconify/vue` 是可选 peer，只有出现 `<Icon>` 时才按需加载；包内不内置图标集，未注册的图标由 Iconify 默认 API 联网获取，离线时会留空。
+包内默认不注册 `Icon`，也不会自动引入 `@iconify/vue`；需要包内代劳时用 `createConfig({ icons: true })`。图标集不内置，未注册的图标由 Iconify 默认 API 联网获取，离线时会留空。
 
 ## 13. 脚本能力（script setup）
 
