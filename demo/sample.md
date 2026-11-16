@@ -209,6 +209,35 @@ graph TD
 
 内置容器写死在包里；自定义容器需要宿主在 `createConfig({ markdown: { container: [{ type, title }] } })` 里声明，再用 `::: 类型名` 触发。
 
+## 12.2 在 Markdown 中使用 Vue
+
+Markdown 最终被编译成 Vue 模板，所以插值、指令和组件都能直接使用（与 VitePress 一致）；前提是走 `createMarkdownComponent`，纯 `renderMarkdown` 只出 HTML 字符串。
+
+**插值**：1 + 1 = {{ 1 + 1 }}。
+
+**指令**（原始 HTML 在 Markdown 中同样有效）：
+
+<span v-for="i in 3" :key="i" style="margin-right: 6px;">{{ i }}</span>
+
+**转义**：用 `v-pre` 让插值保持字面量 —— <span v-pre>{{ 这里不会被编译 }}</span>
+
+**组件**：`<Badge>` 见上一节；组件名请用 PascalCase 或带连字符，否则会被当成行内元素包进 `<p>`。
+
+**脚本**：根级 `<script setup>` 可用，变量会注入模板，下一节演示。相对路径的 `import` 由宿主适配器解析，裸包名交给 importmap。
+
+## 12.3 图标（Iconify）
+
+正文里可直接写 `<Icon>`：
+
+<Icon icon="logos:vite" width="28" height="28" />
+<Icon icon="skill-icons:typescript" width="28" height="28" />
+<Icon icon="lucide:rocket" width="28" height="28" />
+<Icon icon="demo:spark" width="28" height="28" />
+
+前三个靠联网或宿主已注册的集合；最后一个 `demo:spark` 是 demo 启动时用 `registerIconCollection()` 本地注册的，离线也能显示。
+
+`@iconify/vue` 是可选 peer，只有出现 `<Icon>` 时才按需加载；包内不内置图标集，未注册的图标由 Iconify 默认 API 联网获取，离线时会留空。
+
 ## 13. 脚本能力（script setup）
 
 顶部 `<script setup>` 定义了 `features`：

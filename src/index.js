@@ -15,6 +15,7 @@ export { ensureCustomContainers, default as md, render as renderSource } from '.
 export { applyCodeBlock, maskFenceMarkers, unmaskFenceMarkers } from './code-block.js';
 export { stripFrontmatter } from './frontmatter.js';
 export { highlightCode, normalizeLang } from './highlight.js';
+export { Icon, registerIcon, registerIconCollection } from './icons.js';
 export { mountImageZoom } from './image-zoom.js';
 export { default } from './markdown-it.js';
 export {

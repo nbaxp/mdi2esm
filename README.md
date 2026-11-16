@@ -44,6 +44,8 @@ import 'mdi2esm/index.min.css';
 
 也可用未压缩的 `mdi2esm/index.css`。这套样式不包含站点 header、sidebar、nav、搜索等布局，宿主可以在 `:root` / `.dark` 上覆盖 `--vp-*` 变量做主题定制。代码高亮由 Prism 生成 `token` 类，配色已包含在样式里；Prism 本身已内联，无需额外安装。
 
+代码块支持的语言覆盖 TIOBE 前 20 中 Prism 有语法的部分（Scratch 除外），再加上文档常用语言：`python` `c` `cpp` `java` `csharp` `javascript` `visual-basic` `go` `sql` `pascal`（Delphi）`fortran` `r` `rust` `php` `matlab` `kotlin` `ruby` `swift` `nasm`（汇编），以及 `bash` `batch` `diff` `docker` `ini` `json` `markdown` `nginx` `powershell` `typescript` `yaml`；`markup`（html/xml/svg）、`css`、`clike` 由 Prism 核心自带。别名如 `c++`、`c#`、`delphi`、`vb`、`asm`、`sh`、`yml`、`md`、`vue` 会自动归一化。
+
 页内目录（`.vp-doc-outline`）的尺寸、层级与状态取值与 VitePress 的 `VPDocAsideOutline` / `VPDocOutlineItem` 一致：1px 发丝线、1rem 内缩、链接 14px / 行高 2.2857143、当前项取 `--vp-c-text-1`，另带图样相同的 2px `.outline-marker`。当前项由宿主做滚动同步：给链接加 `.active`（或 `aria-current="location"`），并把 `.outline-marker` 的 `top`、`opacity` 设到对应位置；demo 实现见 `demo/main.js`。正文里的 `[[toc]]`（`.table-of-contents`）默认样式是无项目符号的卡片式目录，嵌套层级自动缩进，这是相对 VitePress 的故意增强（VitePress 本体不给它样式）。
 
 `<Badge>` 这类主题组件不在包内，但样式随包发布：`index.css` 已包含 `.VPBadge` 规则与 `--vp-badge-*` 变量，宿主只需提供组件脚本。mdoc 已有自己的主题样式，只引脚本、不引这套 CSS；纯 ESM 场景同时引 CSS 与组件即可。
@@ -53,6 +55,46 @@ KaTeX 的样式与字体属于 peer，由你安装的 `katex` 包提供，需自
 ```js
 import 'katex/dist/katex.min.css';
 ```
+
+## 图标（Iconify）
+
+正文里可以直接写 `<Icon>`，无需宿主注册组件：
+
+```md
+<Icon icon="logos:vite" width="24" height="24" />
+<Icon icon="lucide:rocket" />
+```
+
+`@iconify/vue` 是可选 peer：页面真的渲染 `<Icon>` 时才动态 `import()`，未安装时不影响其他功能。包内不内置图标集，未注册的图标（以及没有 `addCollection` 注册的整个集合）由 Iconify 默认 API `api.iconify.design` 联网获取，离线、内网或无此图标时会留空。需要离线渲染时，宿主自行安装 `@iconify-json/*`，再调用本包的 `registerIconCollection()`（或直接 `addCollection()`）。
+
+`Icon` 也从包入口导出，需要手动注册时可直接用。
+
+调用时可以直接扩充本地图标集，离线可用：
+
+```js
+import { registerIconCollection, registerIcon } from 'mdi2esm';
+import { icons } from '@iconify-json/lucide';
+
+await registerIconCollection(icons); // 整个集合
+await registerIcon('demo:spark', { body: '<path d="M12 2l9 9-9 9-9-9z"/>', width: 24, height: 24 });
+```
+
+注册通过 `@iconify/vue` 的模块单例生效，所以只需保证宿主与 mdi2esm 解析到同一个 `@iconify/vue`（importmap 单条映射或打包器去重）。后注册也有效：Iconify 会通知已渲染的 `<Icon>` 重绘。
+
+打包器场景需要显式去重，并保持它作为外部依赖（不要内联进 mdi2esm 的产物）：
+
+```js
+// Vite
+export default { resolve: { dedupe: ['@iconify/vue'] } };
+
+// Rollup
+nodeResolve({ dedupe: ['@iconify/vue'] });
+
+// webpack
+resolve: { alias: { '@iconify/vue': path.resolve('node_modules/@iconify/vue') } };
+```
+
+再用 `npm ls @iconify/vue` 或 `npm dedupe` 确认依赖树只有一份。判断是否出现双实例：注册后 `getIcon('lucide:rocket')` 有值，但页面上的 `<Icon icon="lucide:rocket">` 仍然请求网络或空白，基本就是两份模块实例。
 
 ## 公共 API
 

@@ -19,7 +19,7 @@ const dist = path.join(root, 'dist');
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(dist, { recursive: true });
 
-const peerBare = ['vue', 'vue-style-runtime', 'katex', 'mermaid', 'medium-zoom'];
+const peerBare = ['@iconify/vue', 'vue', 'vue-style-runtime', 'katex', 'mermaid', 'medium-zoom'];
 const isExternal = (id) => peerBare.includes(id);
 // 核心栈依赖（被内联）装在本包 node_modules，Vite 默认即可解析，无需 alias
 

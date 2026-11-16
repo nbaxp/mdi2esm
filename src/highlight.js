@@ -4,31 +4,55 @@
 import Prism from 'prismjs';
 import 'prismjs/components/prism-bash.js';
 import 'prismjs/components/prism-batch.js';
+import 'prismjs/components/prism-c.js';
+import 'prismjs/components/prism-cpp.js';
 import 'prismjs/components/prism-csharp.js';
 import 'prismjs/components/prism-diff.js';
 import 'prismjs/components/prism-docker.js';
+import 'prismjs/components/prism-fortran.js';
 import 'prismjs/components/prism-go.js';
 import 'prismjs/components/prism-ini.js';
 import 'prismjs/components/prism-java.js';
 import 'prismjs/components/prism-json.js';
+import 'prismjs/components/prism-kotlin.js';
 import 'prismjs/components/prism-markdown.js';
+import 'prismjs/components/prism-markup-templating.js';
+import 'prismjs/components/prism-matlab.js';
+import 'prismjs/components/prism-nasm.js';
 import 'prismjs/components/prism-nginx.js';
+import 'prismjs/components/prism-pascal.js';
+import 'prismjs/components/prism-perl.js';
+import 'prismjs/components/prism-php.js';
 import 'prismjs/components/prism-powershell.js';
 import 'prismjs/components/prism-python.js';
+import 'prismjs/components/prism-r.js';
+import 'prismjs/components/prism-ruby.js';
+import 'prismjs/components/prism-rust.js';
 import 'prismjs/components/prism-sql.js';
+import 'prismjs/components/prism-swift.js';
 import 'prismjs/components/prism-typescript.js';
+import 'prismjs/components/prism-visual-basic.js';
 import 'prismjs/components/prism-yaml.js';
 /* eslint-enable simple-import-sort/imports */
 
 // Prism 未注册、但 mdi2esm 需要兼容的写法。
 // 其余别名（cs/ts/js/sh/yml/md/py/html/xml/dockerfile…）由 Prism 语言组件自带。
 const LANG_ALIASES = {
+  asm: 'nasm',
   bat: 'batch',
+  'c#': 'csharp',
+  'c++': 'cpp',
   cmd: 'batch',
+  cplusplus: 'cpp',
+  cs: 'csharp',
+  delphi: 'pascal',
   shellscript: 'bash',
   template: 'markup',
+  vb: 'visual-basic',
+  vbnet: 'visual-basic',
   vue: 'markup',
   'vue-html': 'markup',
+  yml: 'yaml',
 };
 
 // ```ts:no-line-numbers 这类 info 会把标记拼在语言名后，取冒号前的语言名。

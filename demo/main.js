@@ -5,7 +5,7 @@ import './demo.css';
 
 import { createApp, h } from 'vue';
 
-import { buildOutline, createConfig, createMarkdownComponent } from '../dist/index.min.js';
+import { buildOutline, createConfig, createMarkdownComponent, registerIconCollection } from '../dist/index.min.js';
 // 独立 md 源文件，作为可编辑示例的初始值
 import sample from './sample.md?raw';
 // 宿主提供的组件（mdi2esm 不内置 Badge），演示由宿主注入
@@ -29,6 +29,22 @@ let marker = null;
 let spyLinks = [];
 let spyTargets = [];
 let spyRaf = 0;
+let iconsReady = null;
+
+// 本地注册一个图标集：离线也能渲染，不请求 Iconify API
+function ensureLocalIcons() {
+  iconsReady ??= registerIconCollection({
+    prefix: 'demo',
+    icons: {
+      spark: {
+        body: '<path fill="currentColor" d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/>',
+        width: 24,
+        height: 24,
+      },
+    },
+  });
+  return iconsReady;
+}
 
 // 大纲层级交给 .vp-doc-outline .lvl-N 控制，不写内联样式
 function renderOutline(items, container, level = 2) {
@@ -101,6 +117,7 @@ window.addEventListener('resize', scheduleActive);
 
 async function run() {
   // 完整管线：frontmatter / Prism 高亮 / KaTeX / script setup / 容器 全部在此完成
+  await ensureLocalIcons();
   const { component, headings } = await createMarkdownComponent(ta.value, '', config);
   if (app) app.unmount();
   content.innerHTML = '';

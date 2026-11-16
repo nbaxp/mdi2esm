@@ -5,6 +5,7 @@ import { styleMixin } from 'vue-style-runtime';
 
 import { maskFenceMarkers, unmaskFenceMarkers } from './code-block.js';
 import { stripFrontmatter } from './frontmatter.js';
+import { Icon } from './icons.js';
 import { mountImageZoom } from './image-zoom.js';
 import { createScriptModule, createSetup } from './markdown-script.js';
 import { renderMath } from './math.js';
@@ -101,7 +102,7 @@ export async function createMarkdownComponent(source, dir, config, { frontmatter
       this.$frontmatter = frontmatter ?? {};
     },
     render: compile(escapeInvalidInterpolations(withMath)),
-    components: { ClientOnly: { template: '<slot />' } },
+    components: { ClientOnly: { template: '<slot />' }, Icon },
     // mermaid 图形在挂载后写入真实 DOM，避免 Vue 编译丢弃 SVG 内的 <style>
     mounted() {
       mountMermaid().catch(() => {});
