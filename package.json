@@ -1,6 +1,6 @@
 {
   "name": "mdi2esm",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "A markdown-it wrapper with common plugins integrated: containers, footnotes, task lists, anchors, code highlighting, KaTeX math, Mermaid diagrams and outlines, shipped as browser-native ESM.",
   "type": "module",
   "author": "wanggang <76527413@qq.com>",

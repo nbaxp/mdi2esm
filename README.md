@@ -81,6 +81,13 @@ await registerIcon('demo:spark', { body: '<path d="M12 2l9 9-9 9-9-9z"/>', width
 
 注册通过 `@iconify/vue` 的模块单例生效，所以只需保证宿主与 mdi2esm 解析到同一个 `@iconify/vue`（importmap 单条映射或打包器去重）。后注册也有效：Iconify 会通知已渲染的 `<Icon>` 重绘。
 
+如果不想共用实例，可以让宿主接管图标组件：
+
+```js
+createConfig({ icons: false }); // 不注册内置 Icon，由 app.component('Icon', ...) 提供
+createConfig({ icons: MyIcon }); // 直接换成指定组件
+```
+
 打包器场景需要显式去重，并保持它作为外部依赖（不要内联进 mdi2esm 的产物）：
 
 ```js

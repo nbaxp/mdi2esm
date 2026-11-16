@@ -82,6 +82,14 @@ function mergeScriptOptions(options, def) {
   }
 }
 
+// 图标组件解析：默认用内置异步 Icon；icons: false 交给宿主全局注册；也可直接传组件定义
+function resolveIconComponent(config = {}) {
+  const { icons } = config;
+  if (icons === false) return null;
+  if (icons && (typeof icons === 'object' || typeof icons === 'function')) return icons;
+  return Icon;
+}
+
 /**
  * Markdown 文本 → Vue 组件。
  * @param {string} source Markdown 原文
@@ -90,6 +98,7 @@ function mergeScriptOptions(options, def) {
  * @returns {Promise<object|null>} 组件定义；空正文返回 null
  */
 export async function createMarkdownComponent(source, dir, config, { frontmatter, params } = {}) {
+  const iconComponent = resolveIconComponent(config);
   const { body, scripts, styles } = extractTopLevelBlocks(stripFrontmatter(source));
   const { html, headings } = renderMarkdown(maskFenceMarkers(body), { dir, config });
   const withMath = await renderMath(unmaskFenceMarkers(html), config);
@@ -102,7 +111,10 @@ export async function createMarkdownComponent(source, dir, config, { frontmatter
       this.$frontmatter = frontmatter ?? {};
     },
     render: compile(escapeInvalidInterpolations(withMath)),
-    components: { ClientOnly: { template: '<slot />' }, Icon },
+    components: {
+      ClientOnly: { template: '<slot />' },
+      ...(iconComponent ? { Icon: iconComponent } : {}),
+    },
     // mermaid 图形在挂载后写入真实 DOM，避免 Vue 编译丢弃 SVG 内的 <style>
     mounted() {
       mountMermaid().catch(() => {});
