@@ -1,6 +1,6 @@
 # mdi2esm
 
-A markdown-it wrapper with common plugins integrated. It renders Markdown into VitePress-style HTML, with code highlighting, math (KaTeX), Mermaid diagrams, outlines and image zoom built in. The core markdown stack is bundled and ships as browser-native ESM; framework and heavy dependencies are left as peers for the host to provide.
+A markdown-it wrapper with common plugins integrated. It renders Markdown into VitePress-style HTML, with code highlighting, math (KaTeX), Mermaid diagrams, outlines and image zoom built in. The core markdown stack and Prism are bundled into a single browser-ready ESM artifact; framework and heavy dependencies are left as peers for the host to provide.
 
 ## 环境要求
 
@@ -16,7 +16,7 @@ npm i mdi2esm
 同时安装 peer 依赖（用到哪些功能装哪些；完整能力需要全部）：
 
 ```sh
-npm i mdi2esm vue shiki @shikijs/transformers katex mermaid medium-zoom
+npm i mdi2esm vue vue-style-runtime katex mermaid medium-zoom
 ```
 
 ## 用法
@@ -32,21 +32,21 @@ const finalHtml = await renderMath(html, config);
 const outline = buildOutline(headings);
 ```
 
-`package.json` 的 `exports` 提供两个入口：默认（生产）指向压缩版 `dist/index.min.js`，`development` 条件指向未压缩的 `dist/index.js`；也可显式用 `mdi2esm/index` 与 `mdi2esm/index.min`。
+`package.json` 的 `exports` 提供两个 JS 入口：默认（生产）指向压缩版 `dist/index.min.js`，`development` 条件指向未压缩的 `dist/index.js`；也可显式用 `mdi2esm/index` 与 `mdi2esm/index.min`。
 
 ## 样式
 
-渲染产物的类名沿用 VitePress 风格（`.vp-doc`、`.custom-block` 等），本包不附带样式，需自行提供。
-
-Markdown 里用 `<Badge>` 时，徽标样式需由宿主全局注入一次（组件本身不注入样式）：
+渲染产物的类名沿用 VitePress 风格（`.vp-doc`、`.custom-block` 等）。包内附带一套只覆盖 markdown 正文与页内目录（`.vp-doc`、`.vp-doc-outline`）的样式：
 
 ```js
-import { badgeStyles } from 'mdi2esm';
-
-const el = document.createElement('style');
-el.textContent = badgeStyles;
-document.head.appendChild(el);
+import 'mdi2esm/index.min.css';
 ```
+
+也可用未压缩的 `mdi2esm/index.css`。这套样式不包含站点 header、sidebar、nav、搜索等布局，宿主可以在 `:root` / `.dark` 上覆盖 `--vp-*` 变量做主题定制。代码高亮由 Prism 生成 `token` 类，配色已包含在样式里；Prism 本身已内联，无需额外安装。
+
+页内目录（`.vp-doc-outline`）的尺寸、层级与状态取值与 VitePress 的 `VPDocAsideOutline` / `VPDocOutlineItem` 一致：1px 发丝线、1rem 内缩、链接 14px / 行高 2.2857143、当前项取 `--vp-c-text-1`，另带图样相同的 2px `.outline-marker`。当前项由宿主做滚动同步：给链接加 `.active`（或 `aria-current="location"`），并把 `.outline-marker` 的 `top`、`opacity` 设到对应位置；demo 实现见 `demo/main.js`。正文里的 `[[toc]]`（`.table-of-contents`）默认样式是无项目符号的卡片式目录，嵌套层级自动缩进，这是相对 VitePress 的故意增强（VitePress 本体不给它样式）。
+
+`<Badge>` 这类主题组件不在包内，但样式随包发布：`index.css` 已包含 `.VPBadge` 规则与 `--vp-badge-*` 变量，宿主只需提供组件脚本。mdoc 已有自己的主题样式，只引脚本、不引这套 CSS；纯 ESM 场景同时引 CSS 与组件即可。
 
 KaTeX 的样式与字体属于 peer，由你安装的 `katex` 包提供，需自行引入：
 
@@ -61,9 +61,9 @@ import 'katex/dist/katex.min.css';
 - 配置：`createConfig`、`createEsmAdapters`、`createMdocAdapters`、`DEFAULT_CONFIG`、`DEFAULT_ADAPTERS`、`CONTAINER_LABELS`、`COPY_LABELS`
 - 渲染环境：`createRenderEnv`
 - 渲染：`renderMarkdown`、`renderSource`、`renderMath`、`md`（markdown-it 实例）、`ensureCustomContainers`、`buildOutline`、`escapeInvalidInterpolations`、`resolvePath`
-- 代码块：`applyCodeBlock`、`maskFenceMarkers`、`unmaskFenceMarkers`、`highlightCodeBlocks`
+- 代码块：`applyCodeBlock`、`maskFenceMarkers`、`unmaskFenceMarkers`、`highlightCode`、`normalizeLang`
 - 管线：`createMarkdownComponent`、`extractTopLevelBlocks`
-- 其它：`stripFrontmatter`、`mountImageZoom`、`mountMermaid`、`VPBadge`
+- 其它：`stripFrontmatter`、`mountImageZoom`、`mountMermaid`
 - 浏览器脚本模块：`createScriptModule`、`createSetup`、`buildScriptModuleSource`、`buildSetupModuleSource`
 - Markdown 插件辅助：`anchorHref`、`normalizeHash`、`applyRestoreEntities`、`applyTablePlugin`、`applyLineNumbers`、`fenceMetaAttrs`、`escapeHtml`
 

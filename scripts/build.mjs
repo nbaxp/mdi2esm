@@ -2,13 +2,14 @@
 //   dist/index.js      —— 完整打包版（未压缩，便于调试）
 //   dist/index.min.js  —— 完整打包版（压缩，供生产使用）
 //   dist/index.html    —— demo 页（包根 index.html 经 Vite 构建，自动 bundle 所有 peer，无需 importmap/vendor）
-// 完整打包版内联 markdown 核心栈（markdown-it / @mdit* / @mdit-vue）；其余框架与重依赖
-// （vue / vue-style-runtime / katex / mermaid / medium-zoom / shiki / @shikijs/transformers）外部化为 peer，
+// 完整打包版内联 markdown 核心栈（markdown-it / @mdit* / @mdit-vue）与 Prism；其余框架与重依赖
+// （vue / vue-style-runtime / katex / mermaid / medium-zoom）外部化为 peer，
 // 由消费方提供，避免重复实例与体积膨胀。
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { bundle } from 'lightningcss';
 import { build } from 'vite';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -18,8 +19,8 @@ const dist = path.join(root, 'dist');
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(dist, { recursive: true });
 
-const peerBare = ['vue', 'vue-style-runtime', 'katex', 'mermaid', 'medium-zoom', '@shikijs/transformers'];
-const isExternal = (id) => peerBare.includes(id) || id === 'shiki' || id.startsWith('shiki/');
+const peerBare = ['vue', 'vue-style-runtime', 'katex', 'mermaid', 'medium-zoom'];
+const isExternal = (id) => peerBare.includes(id);
 // 核心栈依赖（被内联）装在本包 node_modules，Vite 默认即可解析，无需 alias
 
 async function main() {
@@ -43,7 +44,7 @@ async function main() {
         },
         rollupOptions: {
           external: isExternal,
-          // 库产物须为单文件：禁用代码分割，内联所有动态 import（如 shiki-setup），
+          // 库产物须为单文件：禁用代码分割，内联所有动态 import（如 Prism 语言组件），
           // 否则会拆出相对 chunk，消费方 import 'mdi2esm' 时拿不到。
           output: { codeSplitting: false },
         },
@@ -75,6 +76,15 @@ async function main() {
       rollupOptions: { input: path.join(root, 'index.html') },
     },
   });
+
+  // 3) 独立样式：src/styles/index.css → dist/index.css / dist/index.min.css
+  for (const [name, minify] of [
+    ['index.css', false],
+    ['index.min.css', true],
+  ]) {
+    const { code } = bundle({ filename: path.join(root, 'src', 'styles', 'index.css'), minify });
+    fs.writeFileSync(path.join(dist, name), code);
+  }
 
   console.log('built ->', path.relative(root, dist));
 }

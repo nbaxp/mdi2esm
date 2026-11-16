@@ -55,7 +55,7 @@ export function applyTablePlugin(md) {
 // 官方 link.ts:151-153：链接里的 #中文 标题 按与 anchor 相同的 slugify 归一化
 export const normalizeHash = (hash) => (hash ? `#${slugify(decodeURI(hash))}` : '');
 
-// 官方 highlight.ts:105-111：剥出 fence info 里语言之后的元信息，交给 Shiki transformers
+// 官方 highlight.ts:105-111：剥出 fence info 里语言之后的元信息，交给 Prism 行标记
 export const fenceMetaAttrs = (info) => {
   const match = /^[a-zA-Z0-9-_]+/.exec(info);
   return match

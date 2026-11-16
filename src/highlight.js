@@ -1,121 +1,59 @@
-// Shiki 高亮（移植自 mdoc）：markdown-it 的 highlight 是同步的，渲染后按 DOM 异步替换
-// 主题对齐 VitePress 默认双主题（github-light / github-dark），跟随 html.dark 切换
-import {
-  transformerMetaHighlight,
-  transformerNotationDiff,
-  transformerNotationErrorLevel,
-  transformerNotationFocus,
-  transformerNotationHighlight,
-} from '@shikijs/transformers';
+// Prism 代码高亮：同步 API，直接接入 markdown-it 的 fence 渲染。
+// 语言组件按需静态引入，构建时由 Vite 内联；不再依赖 shiki 的异步加载与渲染后 DOM 替换。
+/* eslint-disable simple-import-sort/imports -- Prism 语言组件必须在 prismjs 核心之后执行 */
+import Prism from 'prismjs';
+import 'prismjs/components/prism-bash.js';
+import 'prismjs/components/prism-batch.js';
+import 'prismjs/components/prism-csharp.js';
+import 'prismjs/components/prism-diff.js';
+import 'prismjs/components/prism-docker.js';
+import 'prismjs/components/prism-go.js';
+import 'prismjs/components/prism-ini.js';
+import 'prismjs/components/prism-java.js';
+import 'prismjs/components/prism-json.js';
+import 'prismjs/components/prism-markdown.js';
+import 'prismjs/components/prism-nginx.js';
+import 'prismjs/components/prism-powershell.js';
+import 'prismjs/components/prism-python.js';
+import 'prismjs/components/prism-sql.js';
+import 'prismjs/components/prism-typescript.js';
+import 'prismjs/components/prism-yaml.js';
+/* eslint-enable simple-import-sort/imports */
 
-import { fenceMetaAttrs } from './markdown-plugins.js';
-
-const SHIKI_THEMES = { light: 'github-light', dark: 'github-dark' };
-// 对齐 VitePress：defaultColor=false 只输出 --shiki-light/--shiki-dark，交给官方 CSS 按 html.dark 切换
-const SHIKI_OPTIONS = {
-  themes: SHIKI_THEMES,
-  defaultColor: false,
-  colorReplacements: {
-    'github-light': {
-      '#959da5': '#6c676f',
-      '#28a745': '#0e790b',
-      '#b08800': '#846312',
-      '#e36209': '#c13617',
-      '#3192aa': '#05728b',
-      '#d73a49': '#c62739',
-      '#22863a': '#11782a',
-      '#6a737d': '#62687b',
-      '#1b7c83': '#06747a',
-      '#0366d6': '#0663d0',
-      '#cb2431': '#c82430',
-    },
-    'github-dark': {
-      '#586069': '#5b93a3',
-      '#6a737d': '#818e99',
-      '#ea4a5a': '#ef5564',
-      '#2188ff': '#268bf9',
-    },
-  },
+// Prism 未注册、但 mdi2esm 需要兼容的写法。
+// 其余别名（cs/ts/js/sh/yml/md/py/html/xml/dockerfile…）由 Prism 语言组件自带。
+const LANG_ALIASES = {
+  bat: 'batch',
+  cmd: 'batch',
+  shellscript: 'bash',
+  template: 'markup',
+  vue: 'markup',
+  'vue-html': 'markup',
 };
 
-// 官方 highlight.ts:81-97, 161-193 的 transformer 组合
-const TRANSFORMERS = [
-  transformerMetaHighlight(),
-  transformerNotationDiff(),
-  transformerNotationFocus({ classActiveLine: 'has-focus', classActivePre: 'has-focused-lines' }),
-  transformerNotationHighlight(),
-  transformerNotationErrorLevel(),
-  {
-    name: 'vitepress:add-dir',
-    pre(node) {
-      node.properties.dir = 'ltr';
-    },
-  },
-  {
-    name: 'vitepress:v-pre',
-    pre(node) {
-      node.properties['v-pre'] = '';
-    },
-  },
-  {
-    name: 'vitepress:empty-line',
-    code(hast) {
-      for (const span of hast.children) {
-        if (
-          span.type === 'element' &&
-          span.tagName === 'span' &&
-          Array.isArray(span.properties.class) &&
-          span.properties.class.includes('line') &&
-          span.children.length === 0
-        ) {
-          span.children.push({ type: 'element', tagName: 'wbr', properties: {}, children: [] });
-        }
-      }
-    },
-  },
-];
-let shikiModule;
-
-async function loadShiki() {
-  shikiModule ??= import('./shiki-setup.js').catch(() => null);
-  return shikiModule;
+// ```ts:no-line-numbers 这类 info 会把标记拼在语言名后，取冒号前的语言名。
+export function normalizeLang(lang) {
+  const key = String(lang ?? '')
+    .trim()
+    .toLowerCase()
+    .split(':')[0];
+  return LANG_ALIASES[key] ?? key;
 }
 
-export async function highlightCodeBlocks(html) {
-  if (!html.includes('class="language-')) return html;
-  const container = document.createElement('div');
-  container.innerHTML = html;
-  const targets = Array.from(container.querySelectorAll('div[class*="language-"][dir="ltr"]'))
-    .map((wrapper) => ({ wrapper, pre: wrapper.querySelector(':scope > pre') }))
-    .filter(({ pre }) => pre);
-  if (targets.length === 0) return html;
-
-  const shiki = await loadShiki();
-  const codeToHtml = shiki?.codeToHtml ?? shiki?.default?.codeToHtml;
-  if (!codeToHtml) return html;
-
-  await Promise.all(
-    targets.map(async ({ wrapper, pre }) => {
-      const lang = (/language-([\w-]+)/.exec(wrapper.className)?.[1] ?? '').toLowerCase();
-      if (!lang) return;
-      try {
-        // 官方 highlight.ts:105-111：语言之后的元信息（{1,3}、:line-numbers）作为 meta.__raw
-        const out = await codeToHtml(pre.textContent, {
-          lang,
-          meta: { __raw: fenceMetaAttrs(wrapper.dataset.meta ?? '') },
-          transformers: TRANSFORMERS,
-          ...SHIKI_OPTIONS,
-        });
-        const template = document.createElement('template');
-        template.innerHTML = out;
-        const next = template.content.firstElementChild;
-        if (!next) return;
-        pre.replaceWith(next);
-      } catch {
-        // 未注册的语言或引擎异常：保留 markdown-it 输出的转义纯文本
-      }
-    }),
-  );
-
-  return container.innerHTML;
+/**
+ * 高亮一段代码。
+ * @param {string} code 源码
+ * @param {string} lang 语言名或别名
+ * @returns {string|null} 高亮后的 HTML；Prism 不认识该语言时返回 null，由调用方转义为纯文本
+ */
+export function highlightCode(code, lang) {
+  const name = normalizeLang(lang);
+  const grammar = Prism.languages[name];
+  if (!grammar) return null;
+  try {
+    return Prism.highlight(code, grammar, name);
+  } catch {
+    // 单个语法异常不应让整页渲染失败，退回纯文本
+    return null;
+  }
 }

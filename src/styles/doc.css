@@ -1,0 +1,1334 @@
+/* mdi2esm markdown 正文与页内目录样式。
+   基于 VitePress 默认主题的 markdown 部分裁剪：只保留 .vp-doc、代码块、custom-block、
+   code-group、行号与页内 outline；不包含站点 header、sidebar、nav、搜索等布局。 */
+
+/* 作用域重置：等价于 VitePress preflight 的 markdown 子集，避免污染宿主页面 */
+.vp-doc,
+.vp-doc *,
+.vp-doc *::before,
+.vp-doc *::after {
+  box-sizing: border-box;
+}
+
+.vp-doc {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 1.5rem;
+  color: var(--vp-c-text-1);
+  font-family: var(--vp-font-family-base);
+  line-height: 1.5;
+}
+
+.vp-doc :where(h1, h2, h3, h4, h5, h6, p, ul, ol, li, blockquote, pre, table, tr, th, td, hr, figure) {
+  margin: 0;
+  padding: 0;
+  border: 0 solid;
+}
+
+.vp-doc :where(img, svg, video, canvas, audio, iframe, embed, object) {
+  display: block;
+  max-width: 100%;
+}
+
+.vp-doc :where(img, video) {
+  height: auto;
+}
+
+.vp-doc :where(code, kbd, samp, pre) {
+  font-family: var(--vp-font-family-mono);
+  font-feature-settings: normal;
+  font-variation-settings: normal;
+}
+
+.vp-doc :where(a) {
+  color: inherit;
+  text-decoration: inherit;
+}
+
+.vp-doc :where(button, input, select, textarea) {
+  font: inherit;
+  color: inherit;
+}
+/* 原版：https://github.com/vuejs/vitepress/blob/v2.0.0-alpha.21/src/client/theme-default/styles/components/vp-doc.css */
+/**
+ * Anchors
+ * -------------------------------------------------------------------------- */
+
+.vp-doc [id] {
+  scroll-margin-top: calc(2.9375rem + var(--vp-extra-scroll-margin, 1.5rem));
+}
+
+/**
+ * Headings
+ * -------------------------------------------------------------------------- */
+
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3,
+.vp-doc h4,
+.vp-doc h5,
+.vp-doc h6 {
+  position: relative;
+  font-weight: 600;
+  outline: none;
+}
+
+.vp-doc h1 {
+  letter-spacing: -0.02em;
+  line-height: 1.4285714;
+  font-size: 1.75rem;
+}
+
+.vp-doc h2 {
+  margin: 3rem 0 1rem;
+  border-top: 1px solid var(--vp-c-divider);
+  padding-top: 1.5rem;
+  letter-spacing: -0.02em;
+  line-height: 1.3333333;
+  font-size: 1.5rem;
+  /* since it already has a top padding of 1.5rem, we don't need extra scroll margin */
+  --vp-extra-scroll-margin: 0px;
+}
+
+.vp-doc h3 {
+  margin: 2rem 0 0;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+  font-size: 1.25rem;
+}
+
+.vp-doc h4 {
+  margin: 1.5rem 0 0;
+  letter-spacing: -0.01em;
+  line-height: 1.3333333;
+  font-size: 1.125rem;
+}
+
+.vp-doc .header-anchor {
+  position: absolute;
+  top: 0;
+  inset-inline-start: 0;
+  margin-inline-start: -0.87em;
+  font-weight: 500;
+  user-select: none;
+  opacity: 0;
+  text-decoration: none;
+  transition:
+    color 0.25s,
+    opacity 0.25s;
+}
+
+.vp-doc .header-anchor:before {
+  content: var(--vp-header-anchor-symbol);
+}
+
+.vp-doc h1:hover .header-anchor,
+.vp-doc h1 .header-anchor:focus,
+.vp-doc h2:hover .header-anchor,
+.vp-doc h2 .header-anchor:focus,
+.vp-doc h3:hover .header-anchor,
+.vp-doc h3 .header-anchor:focus,
+.vp-doc h4:hover .header-anchor,
+.vp-doc h4 .header-anchor:focus,
+.vp-doc h5:hover .header-anchor,
+.vp-doc h5 .header-anchor:focus,
+.vp-doc h6:hover .header-anchor,
+.vp-doc h6 .header-anchor:focus {
+  opacity: 1;
+}
+
+@media (min-width: 48rem) {
+  .vp-doc h1 {
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    font-size: 2rem;
+  }
+}
+
+.vp-doc h2 .header-anchor {
+  top: 1.5rem;
+}
+
+/**
+ * Paragraph and inline elements
+ * -------------------------------------------------------------------------- */
+
+.vp-doc p,
+.vp-doc img,
+.vp-doc summary {
+  margin: 1rem 0;
+}
+
+.vp-doc p {
+  line-height: 1.75;
+}
+
+.vp-doc blockquote {
+  margin: 1rem 0;
+  border-inline-start: 2px solid var(--vp-c-divider);
+  padding-inline-start: 1rem;
+  transition: border-color 0.5s;
+  color: var(--vp-c-text-2);
+}
+
+.vp-doc blockquote > p {
+  margin: 0;
+  font-size: 1rem;
+  transition: color 0.5s;
+}
+
+.vp-doc a {
+  font-weight: 500;
+  color: var(--vp-c-brand-1);
+  text-decoration: underline;
+  text-underline-offset: 0.125rem;
+  transition:
+    color 0.25s,
+    opacity 0.25s;
+}
+
+.vp-doc a:hover {
+  color: var(--vp-c-brand-2);
+}
+
+.vp-doc strong {
+  font-weight: 600;
+}
+
+/**
+ * Lists
+ * -------------------------------------------------------------------------- */
+
+.vp-doc ul,
+.vp-doc ol {
+  padding-inline-start: 1.25rem;
+  margin: 1rem 0;
+}
+
+.vp-doc ul {
+  list-style: disc;
+}
+
+.vp-doc ol {
+  list-style: decimal;
+}
+
+.vp-doc li + li {
+  margin-top: 0.5rem;
+}
+
+.vp-doc li > ol,
+.vp-doc li > ul {
+  margin: 0.5rem 0 0;
+}
+
+.vp-doc li > p:first-child {
+  margin-top: 0;
+}
+
+.vp-doc li > p:last-child {
+  margin-bottom: 0;
+}
+
+.vp-doc li.task-list-item {
+  list-style: none;
+}
+
+.vp-doc .task-list-item-checkbox {
+  margin-block: 0 0.125rem;
+  margin-inline: -1.25rem 0.25rem;
+  vertical-align: middle;
+  accent-color: var(--vp-c-brand-1);
+}
+
+/**
+ * Footnotes
+ * -------------------------------------------------------------------------- */
+
+.vp-doc sup.footnote-ref {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.vp-doc .footnote-ref a,
+.vp-doc .footnote-backref {
+  text-decoration: none;
+}
+
+.vp-doc .footnotes {
+  font-size: 0.875rem;
+}
+
+/**
+ * Table
+ * -------------------------------------------------------------------------- */
+
+.vp-doc table {
+  display: block;
+  border-collapse: collapse;
+  margin: 1.25rem 0;
+  overflow-x: auto;
+}
+
+.vp-doc tr {
+  background-color: var(--vp-c-bg);
+  border-top: 1px solid var(--vp-c-divider);
+  transition: background-color 0.5s;
+}
+
+.vp-doc tr:nth-child(2n) {
+  background-color: var(--vp-c-bg-soft);
+}
+
+.vp-doc th,
+.vp-doc td {
+  border: 1px solid var(--vp-c-divider);
+  padding: 0.5rem 1rem;
+}
+
+.vp-doc th {
+  text-align: start;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--vp-c-text-2);
+  background-color: var(--vp-c-bg-soft);
+}
+
+.vp-doc td {
+  font-size: 0.875rem;
+}
+
+/**
+ * Decorational elements
+ * -------------------------------------------------------------------------- */
+
+.vp-doc hr {
+  margin: 1rem 0;
+  border: none;
+  border-top: 1px solid var(--vp-c-divider);
+}
+
+/**
+ * Custom Block
+ * -------------------------------------------------------------------------- */
+
+.vp-doc .custom-block {
+  margin: 1rem 0;
+}
+
+.vp-doc .custom-block p {
+  margin: 0.5rem 0;
+  line-height: 1.7142857;
+}
+
+.vp-doc .custom-block p:first-child {
+  margin: 0;
+}
+
+.vp-doc .custom-block div[class*='language-'] {
+  margin: 0.5rem 0 !important;
+  border-radius: 0.5rem;
+}
+
+.vp-doc .custom-block div[class*='language-'] code {
+  font-weight: 400;
+  background-color: transparent;
+}
+
+.vp-doc .custom-block .vp-code-group,
+.vp-doc .custom-block [class*='vp-code-block'] {
+  margin-top: 0.5rem;
+}
+
+.vp-doc .custom-block .vp-code-group .tabs {
+  margin: 0;
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.vp-doc .custom-block .vp-code-group div[class*='language-'],
+.vp-doc .custom-block [class*='vp-code-block'] div[class*='language-'] {
+  margin-top: 0 !important;
+}
+
+/**
+ * Code
+ * -------------------------------------------------------------------------- */
+
+/* inline code */
+.vp-doc :not(pre, h1, h2, h3, h4, h5, h6) > code {
+  font-size: var(--vp-code-font-size);
+  color: var(--vp-code-color);
+}
+
+.vp-doc :not(pre) > code {
+  border-radius: 0.25rem;
+  padding: 0.1875rem 0.375rem;
+  background-color: var(--vp-code-bg);
+  /* keep the written order of identifiers and punctuation inside rtl prose */
+  unicode-bidi: plaintext;
+  transition:
+    color 0.25s,
+    background-color 0.5s;
+}
+
+.vp-doc a > code {
+  color: var(--vp-code-link-color);
+}
+
+.vp-doc a:hover > code {
+  color: var(--vp-code-link-hover-color);
+}
+
+.vp-doc h1 > code,
+.vp-doc h2 > code,
+.vp-doc h3 > code,
+.vp-doc h4 > code {
+  font-size: 0.9em;
+}
+
+/* code-block wrappers carry dir="ltr" (see preWrapper.ts), so code, its
+   gutter and its controls keep their physical layout on rtl pages; the
+   logical properties in this section resolve to left/right there */
+.vp-doc div[class*='language-'],
+.vp-block {
+  position: relative;
+  margin: 1rem -1.5rem;
+  background-color: var(--vp-code-block-bg);
+  overflow-x: auto;
+  transition: background-color 0.5s;
+}
+
+@media (min-width: 40rem) {
+  .vp-doc div[class*='language-'],
+  .vp-block {
+    border-radius: 0.5rem;
+    margin: 1rem 0;
+  }
+}
+
+@media not all and (min-width: 40rem) {
+  .vp-doc li div[class*='language-'] {
+    border-radius: 0;
+    border-start-start-radius: 0.5rem;
+    border-end-start-radius: 0.5rem;
+  }
+}
+
+.vp-doc div[class*='language-'] + div[class*='language-'],
+.vp-doc div[class$='-api'] + div[class*='language-'],
+.vp-doc div[class*='language-'] + div[class$='-api'] > div[class*='language-'] {
+  margin-top: -0.5rem;
+}
+
+.vp-doc [class*='language-'] pre,
+.vp-doc [class*='language-'] code {
+  -moz-tab-size: 4;
+  -o-tab-size: 4;
+  tab-size: 4;
+}
+
+.vp-doc [class*='language-'] pre {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 1.25rem 0;
+  background: transparent;
+  overflow-x: auto;
+  text-align: start;
+}
+
+.vp-doc [class*='language-'] code {
+  display: block;
+  padding: 0 1.5rem;
+  width: fit-content;
+  min-width: 100%;
+  line-height: var(--vp-code-line-height);
+  font-size: var(--vp-code-font-size);
+  color: var(--vp-code-block-color);
+  transition: color 0.5s;
+}
+
+.vp-doc [class*='language-'] code .highlighted {
+  background-color: var(--vp-code-line-highlight-color);
+  transition: background-color 0.5s;
+  margin: 0 -1.5rem;
+  padding: 0 1.5rem;
+  width: calc(100% + 2 * 1.5rem);
+  display: inline-block;
+}
+
+.vp-doc [class*='language-'] code .highlighted.error {
+  background-color: var(--vp-code-line-error-color);
+}
+
+.vp-doc [class*='language-'] code .highlighted.warning {
+  background-color: var(--vp-code-line-warning-color);
+}
+
+.vp-doc [class*='language-'] code .diff {
+  transition: background-color 0.5s;
+  margin: 0 -1.5rem;
+  padding: 0 1.5rem;
+  width: calc(100% + 2 * 1.5rem);
+  display: inline-block;
+}
+
+.vp-doc [class*='language-'] code .diff::before {
+  position: absolute;
+  inset-inline-start: 0.625rem;
+}
+
+.vp-doc [class*='language-'] .has-focused-lines .line:not(.has-focus) {
+  will-change: filter;
+  filter: blur(0.095rem);
+  opacity: 0.4;
+  transition:
+    filter 0.35s,
+    opacity 0.35s;
+}
+
+.vp-doc [class*='language-'] .has-focused-lines .line:not(.has-focus) {
+  opacity: 0.7;
+  transition:
+    filter 0.35s,
+    opacity 0.35s;
+}
+
+.vp-doc [class*='language-']:hover .has-focused-lines .line:not(.has-focus) {
+  filter: blur(0);
+  opacity: 1;
+}
+
+.vp-doc [class*='language-'] code .diff.remove {
+  background-color: var(--vp-code-line-diff-remove-color);
+  opacity: 0.7;
+}
+
+.vp-doc [class*='language-'] code .diff.remove::before {
+  content: '-';
+  color: var(--vp-code-line-diff-remove-symbol-color);
+}
+
+.vp-doc [class*='language-'] code .diff.add {
+  background-color: var(--vp-code-line-diff-add-color);
+}
+
+.vp-doc [class*='language-'] code .diff.add::before {
+  content: '+';
+  color: var(--vp-code-line-diff-add-symbol-color);
+}
+
+.vp-doc div[class*='language-'].line-numbers-mode {
+  padding-inline-start: 2rem;
+}
+
+.vp-doc .line-numbers-wrapper {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-start: 0;
+  z-index: 3;
+  border-inline-end: 1px solid var(--vp-code-block-divider-color);
+  padding-top: 1.25rem;
+  width: 2rem;
+  text-align: center;
+  font-family: var(--vp-font-family-mono);
+  line-height: var(--vp-code-line-height);
+  font-size: var(--vp-code-font-size);
+  color: var(--vp-code-line-number-color);
+  transition:
+    border-color 0.5s,
+    color 0.5s;
+}
+
+.vp-doc [class*='language-'] > button.copy {
+  position: absolute;
+  top: 0.75rem;
+  inset-inline-end: 0.75rem;
+  z-index: 3;
+  border: 1px solid var(--vp-code-copy-code-border-color);
+  border-radius: 0.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  background-color: var(--vp-code-copy-code-bg);
+  opacity: 0;
+  cursor: pointer;
+  background-image: var(--vp-icon-copy);
+  background-position: 50%;
+  background-size: 1.25rem;
+  background-repeat: no-repeat;
+  transition:
+    border-color 0.25s,
+    background-color 0.25s,
+    opacity 0.25s;
+}
+
+.vp-doc [class*='language-']:hover > button.copy,
+.vp-doc [class*='language-'] > button.copy:focus {
+  opacity: 1;
+}
+
+.vp-doc [class*='language-'] > button.copy:hover,
+.vp-doc [class*='language-'] > button.copy.copied {
+  border-color: var(--vp-code-copy-code-hover-border-color);
+  background-color: var(--vp-code-copy-code-hover-bg);
+}
+
+.vp-doc [class*='language-'] > button.copy.copied,
+.vp-doc [class*='language-'] > button.copy:hover.copied {
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+  background-color: var(--vp-code-copy-code-hover-bg);
+  background-image: var(--vp-icon-copied);
+}
+
+.vp-doc [class*='language-'] > button.copy.copied::before,
+.vp-doc [class*='language-'] > button.copy:hover.copied::before {
+  position: relative;
+  top: -1px;
+  transform: translateX(calc(-100% - 1px));
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid var(--vp-code-copy-code-hover-border-color);
+  border-inline-end: 0;
+  border-start-start-radius: 0.25rem;
+  border-end-start-radius: 0.25rem;
+  padding: 0 0.625rem;
+  width: fit-content;
+  height: 2.5rem;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--vp-code-copy-code-active-text);
+  background-color: var(--vp-code-copy-code-hover-bg);
+  white-space: nowrap;
+  /* the wrapper is ltr; let the translated label pick its own direction */
+  unicode-bidi: plaintext;
+  content: attr(data-copied);
+}
+
+.vp-doc [class*='language-'] > span.lang {
+  position: absolute;
+  top: 0.125rem;
+  inset-inline-end: 0.5rem;
+  z-index: 2;
+  font-size: 0.75rem;
+  font-weight: 500;
+  user-select: none;
+  color: var(--vp-code-lang-color);
+  transition:
+    color 0.4s,
+    opacity 0.4s;
+}
+
+.vp-doc [class*='language-']:hover > button.copy + span.lang,
+.vp-doc [class*='language-'] > button.copy:focus + span.lang {
+  opacity: 0;
+}
+
+/**
+ * External links
+ * -------------------------------------------------------------------------- */
+
+/* prettier-ignore */
+:where(
+  .vp-external-link-icon,
+  .vp-doc a:is([href*='://'], [target='_blank'])
+):not(.no-icon, svg a, :has(img, svg))::after {
+  display: inline;
+  margin-inline-start: 0.25rem;
+  padding-inline-start: 0.6875rem;
+  background: currentColor;
+  color: currentColor;
+  flex-shrink: 0;
+  --icon: var(--vp-icon-external-link);
+  -webkit-mask-image: var(--icon);
+  mask-image: var(--icon);
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+
+/* prettier-ignore */
+:where(
+  .vp-external-link-icon,
+  .external-link-icon-enabled :is(.vp-doc a:is([href*='://'], [target='_blank']))
+):not(.no-icon, svg a, :has(img, svg))::after {
+  content: var(--vp-direction-mark) '\2060';
+}
+
+/* 原版：https://github.com/vuejs/vitepress/blob/v2.0.0-alpha.21/src/client/theme-default/styles/components/custom-block.css */
+.custom-block {
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  line-height: 1.7142857;
+  font-size: var(--vp-custom-block-font-size);
+  color: var(--vp-c-text-2);
+}
+
+/* containers rendered with `{no-title}` keep the reduced padding */
+.custom-block:has(> .custom-block-title, > summary) {
+  padding-top: 1rem;
+}
+
+.custom-block.info {
+  border-color: var(--vp-custom-block-info-border);
+  color: var(--vp-custom-block-info-text);
+  background-color: var(--vp-custom-block-info-bg);
+}
+
+.custom-block.info a,
+.custom-block.info code {
+  color: var(--vp-c-brand-1);
+}
+
+.custom-block.info a:hover,
+.custom-block.info a:hover > code {
+  color: var(--vp-c-brand-2);
+}
+
+.custom-block.info code {
+  background-color: var(--vp-custom-block-info-code-bg);
+}
+
+.custom-block.note {
+  border-color: var(--vp-custom-block-note-border);
+  color: var(--vp-custom-block-note-text);
+  background-color: var(--vp-custom-block-note-bg);
+}
+
+.custom-block.note a,
+.custom-block.note code {
+  color: var(--vp-c-brand-1);
+}
+
+.custom-block.note a:hover,
+.custom-block.note a:hover > code {
+  color: var(--vp-c-brand-2);
+}
+
+.custom-block.note code {
+  background-color: var(--vp-custom-block-note-code-bg);
+}
+
+.custom-block.tip {
+  border-color: var(--vp-custom-block-tip-border);
+  color: var(--vp-custom-block-tip-text);
+  background-color: var(--vp-custom-block-tip-bg);
+}
+
+.custom-block.tip a,
+.custom-block.tip code {
+  color: var(--vp-c-tip-1);
+}
+
+.custom-block.tip a:hover,
+.custom-block.tip a:hover > code {
+  color: var(--vp-c-tip-2);
+}
+
+.custom-block.tip code {
+  background-color: var(--vp-custom-block-tip-code-bg);
+}
+
+.custom-block.important {
+  border-color: var(--vp-custom-block-important-border);
+  color: var(--vp-custom-block-important-text);
+  background-color: var(--vp-custom-block-important-bg);
+}
+
+.custom-block.important a,
+.custom-block.important code {
+  color: var(--vp-c-important-1);
+}
+
+.custom-block.important a:hover,
+.custom-block.important a:hover > code {
+  color: var(--vp-c-important-2);
+}
+
+.custom-block.important code {
+  background-color: var(--vp-custom-block-important-code-bg);
+}
+
+.custom-block.warning {
+  border-color: var(--vp-custom-block-warning-border);
+  color: var(--vp-custom-block-warning-text);
+  background-color: var(--vp-custom-block-warning-bg);
+}
+
+.custom-block.warning a,
+.custom-block.warning code {
+  color: var(--vp-c-warning-1);
+}
+
+.custom-block.warning a:hover,
+.custom-block.warning a:hover > code {
+  color: var(--vp-c-warning-2);
+}
+
+.custom-block.warning code {
+  background-color: var(--vp-custom-block-warning-code-bg);
+}
+
+.custom-block.danger {
+  border-color: var(--vp-custom-block-danger-border);
+  color: var(--vp-custom-block-danger-text);
+  background-color: var(--vp-custom-block-danger-bg);
+}
+
+.custom-block.danger a,
+.custom-block.danger code {
+  color: var(--vp-c-danger-1);
+}
+
+.custom-block.danger a:hover,
+.custom-block.danger a:hover > code {
+  color: var(--vp-c-danger-2);
+}
+
+.custom-block.danger code {
+  background-color: var(--vp-custom-block-danger-code-bg);
+}
+
+.custom-block.caution {
+  border-color: var(--vp-custom-block-caution-border);
+  color: var(--vp-custom-block-caution-text);
+  background-color: var(--vp-custom-block-caution-bg);
+}
+
+.custom-block.caution a,
+.custom-block.caution code {
+  color: var(--vp-c-caution-1);
+}
+
+.custom-block.caution a:hover,
+.custom-block.caution a:hover > code {
+  color: var(--vp-c-caution-2);
+}
+
+.custom-block.caution code {
+  background-color: var(--vp-custom-block-caution-code-bg);
+}
+
+.custom-block.details {
+  border-color: var(--vp-custom-block-details-border);
+  color: var(--vp-custom-block-details-text);
+  background-color: var(--vp-custom-block-details-bg);
+}
+
+.custom-block.details a {
+  color: var(--vp-c-brand-1);
+}
+
+.custom-block.details a:hover,
+.custom-block.details a:hover > code {
+  color: var(--vp-c-brand-2);
+}
+
+.custom-block.details code {
+  background-color: var(--vp-custom-block-details-code-bg);
+}
+
+.custom-block-title {
+  font-weight: 600;
+}
+
+.custom-block p + p {
+  margin: 0.5rem 0;
+}
+
+.custom-block.details summary {
+  margin: 0 0 0.5rem;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.custom-block.details summary + p {
+  margin: 0.5rem 0;
+}
+
+.custom-block a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.125rem;
+  transition: opacity 0.25s;
+}
+
+.custom-block a:hover {
+  opacity: 0.75;
+}
+
+.custom-block code {
+  font-size: var(--vp-custom-block-code-font-size);
+}
+
+.custom-block.custom-block th,
+.custom-block.custom-block blockquote > p {
+  font-size: var(--vp-custom-block-font-size);
+  color: inherit;
+}
+
+/* 原版：https://github.com/vuejs/vitepress/blob/v2.0.0-alpha.21/src/client/theme-default/styles/components/vp-code-group.css */
+.vp-code-group {
+  margin-top: 1rem;
+}
+
+.vp-code-group .tabs {
+  position: relative;
+  display: flex;
+  margin-inline: -1.5rem;
+  padding: 0 0.75rem;
+  background-color: var(--vp-code-tab-bg);
+  overflow-x: auto;
+  overflow-y: hidden;
+  box-shadow: inset 0 -1px var(--vp-code-tab-divider);
+}
+
+@media (min-width: 40rem) {
+  .vp-code-group .tabs {
+    margin-inline: 0;
+    border-radius: 0.5rem 0.5rem 0 0;
+  }
+}
+
+.vp-code-group .tabs input {
+  position: fixed;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.vp-code-group .tabs label {
+  position: relative;
+  display: inline-block;
+  border-bottom: 1px solid transparent;
+  padding: 0 0.75rem;
+  line-height: 3.4285714;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--vp-code-tab-text-color);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.25s;
+}
+
+.vp-code-group .tabs label::after {
+  position: absolute;
+  inset-inline: 0.5rem;
+  bottom: -1px;
+  z-index: 1;
+  height: 2px;
+  border-radius: 2px;
+  content: '';
+  background-color: transparent;
+  transition: background-color 0.25s;
+}
+
+.vp-code-group label:hover {
+  color: var(--vp-code-tab-hover-text-color);
+}
+
+.vp-code-group input:checked + label {
+  color: var(--vp-code-tab-active-text-color);
+}
+
+.vp-code-group input:checked + label::after {
+  background-color: var(--vp-code-tab-active-bar-color);
+}
+
+.vp-code-group div[class*='language-'],
+.vp-block {
+  display: none;
+  margin-top: 0 !important;
+  border-start-start-radius: 0 !important;
+  border-start-end-radius: 0 !important;
+}
+
+.vp-code-group div[class*='language-'].active,
+.vp-block.active {
+  display: block;
+}
+
+.vp-block {
+  padding: 1.25rem 1.5rem;
+}
+
+/* Prism token 配色（GitHub Light / Dark），替代原 VitePress 的 --shiki-* 变量。
+   行号、copy 按钮与 .line 结构仍由 vp-doc.css 提供。 */
+.vp-doc .line {
+  display: inline-block;
+  width: 100%;
+}
+
+.vp-doc .line.highlighted {
+  background-color: var(--vp-code-line-highlight-color, rgba(127, 127, 127, 0.12));
+}
+
+.vp-doc .token.comment,
+.vp-doc .token.prolog,
+.vp-doc .token.doctype,
+.vp-doc .token.cdata {
+  color: #6a737d;
+}
+
+.vp-doc .token.punctuation {
+  color: #24292f;
+}
+
+.vp-doc .token.namespace {
+  opacity: 0.7;
+}
+
+.vp-doc .token.property,
+.vp-doc .token.tag,
+.vp-doc .token.boolean,
+.vp-doc .token.number,
+.vp-doc .token.constant,
+.vp-doc .token.symbol,
+.vp-doc .token.deleted {
+  color: #005cc5;
+}
+
+.vp-doc .token.selector,
+.vp-doc .token.attr-name,
+.vp-doc .token.string,
+.vp-doc .token.char,
+.vp-doc .token.builtin,
+.vp-doc .token.inserted {
+  color: #032f62;
+}
+
+.vp-doc .token.operator,
+.vp-doc .token.entity,
+.vp-doc .token.url {
+  color: #d73a49;
+}
+
+.vp-doc .token.atrule,
+.vp-doc .token.attr-value,
+.vp-doc .token.keyword {
+  color: #d73a49;
+}
+
+.vp-doc .token.function,
+.vp-doc .token.class-name {
+  color: #6f42c1;
+}
+
+.vp-doc .token.regex,
+.vp-doc .token.important,
+.vp-doc .token.variable {
+  color: #e36209;
+}
+
+.dark .vp-doc .token.comment,
+.dark .vp-doc .token.prolog,
+.dark .vp-doc .token.doctype,
+.dark .vp-doc .token.cdata {
+  color: #8b949e;
+}
+
+.dark .vp-doc .token.punctuation {
+  color: #c9d1d9;
+}
+
+.dark .vp-doc .token.property,
+.dark .vp-doc .token.tag,
+.dark .vp-doc .token.boolean,
+.dark .vp-doc .token.number,
+.dark .vp-doc .token.constant,
+.dark .vp-doc .token.symbol,
+.dark .vp-doc .token.deleted {
+  color: #79c0ff;
+}
+
+.dark .vp-doc .token.selector,
+.dark .vp-doc .token.attr-name,
+.dark .vp-doc .token.string,
+.dark .vp-doc .token.char,
+.dark .vp-doc .token.builtin,
+.dark .vp-doc .token.inserted {
+  color: #a5d6ff;
+}
+
+.dark .vp-doc .token.operator,
+.dark .vp-doc .token.entity,
+.dark .vp-doc .token.url {
+  color: #ff7b72;
+}
+
+.dark .vp-doc .token.atrule,
+.dark .vp-doc .token.attr-value,
+.dark .vp-doc .token.keyword {
+  color: #ff7b72;
+}
+
+.dark .vp-doc .token.function,
+.dark .vp-doc .token.class-name {
+  color: #d2a8ff;
+}
+
+.dark .vp-doc .token.regex,
+.dark .vp-doc .token.important,
+.dark .vp-doc .token.variable {
+  color: #ffa657;
+}
+
+.vp-doc .token.bold {
+  font-weight: 700;
+}
+
+.vp-doc .token.italic {
+  font-style: italic;
+}
+
+/* ---- 页内 [[toc]] ---- */
+/* 默认输出是 <nav class="table-of-contents"><ul><li><a>…，只继承 .vp-doc 的
+   列表圆点与链接样式，这里改成无项目符号、可嵌套的卡片式目录。 */
+.vp-doc .table-of-contents {
+  margin: 1.5rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background-color: var(--vp-c-bg-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.vp-doc .table-of-contents ul {
+  margin: 0;
+  padding-inline-start: 0;
+  list-style: none;
+}
+
+.vp-doc .table-of-contents ul ul {
+  margin-top: 0.125rem;
+  padding-inline-start: 1rem;
+}
+
+.vp-doc .table-of-contents li {
+  margin: 0;
+}
+
+.vp-doc .table-of-contents a {
+  display: block;
+  padding: 3px 0;
+  color: var(--vp-c-text-2);
+  font-weight: 400;
+  text-decoration: none;
+}
+
+.vp-doc .table-of-contents a:hover {
+  color: var(--vp-c-brand-1);
+  text-decoration: none;
+}
+
+.vp-doc .table-of-contents a:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ---- 页内目录（边栏） ---- */
+/* 数值与 VitePress 的 VPDocAsideOutline / VPDocOutlineItem 保持一致：
+   1px 发丝线、1rem 内缩、容器 13px/500、链接 14px/400/行高 2.2857143、
+   当前项取 text-1（不改字重）、独立 2px 品牌色标记。mdoc 用 VitePress 组件，
+   这里只有变量来源不同，渲染结果应当一致。 */
+.vp-doc-outline {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-inline-start: 1px solid var(--vp-c-divider);
+  padding-inline-start: 1rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.vp-doc-outline .outline-marker {
+  position: absolute;
+  top: 0;
+  inset-inline-start: 0;
+  z-index: 0;
+  width: 2px;
+  height: 1.125rem;
+  border-radius: 2px;
+  background-color: var(--vp-c-brand-1);
+  opacity: 0;
+  transition:
+    top 0.25s cubic-bezier(0, 1, 0.5, 1),
+    background-color 0.5s,
+    opacity 0.25s;
+}
+
+.vp-doc-outline .vp-doc-outline-title {
+  line-height: 2.2857143;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.vp-doc-outline a {
+  position: relative;
+  z-index: 1;
+  display: block;
+  color: var(--vp-c-text-2);
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 2.2857143;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.5s;
+}
+
+.vp-doc-outline a:hover,
+.vp-doc-outline a.active,
+.vp-doc-outline a[aria-current='location'] {
+  color: var(--vp-c-text-1);
+  transition: color 0.25s;
+}
+
+.vp-doc-outline a:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.vp-doc-outline .lvl-2 {
+  padding-inline-start: 0;
+}
+
+.vp-doc-outline .lvl-3 {
+  padding-inline-start: 1rem;
+}
+
+.vp-doc-outline .lvl-4 {
+  padding-inline-start: 2rem;
+}
+
+/* ---- Mermaid / 数学占位 ---- */
+.vp-doc .mermaid-block {
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
+.vp-doc .mermaid-source {
+  margin: 0;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background-color: var(--vp-code-block-bg);
+  font-family: var(--vp-font-family-mono);
+  font-size: var(--vp-code-font-size);
+}
+
+.vp-doc .md-math-placeholder[data-display='true'] {
+  display: block;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
+/* ---- 宿主组件：Badge ---- */
+/* 组件本身由宿主提供（mdoc 只引脚本、复用其主题样式）；随包发布的样式让纯 ESM 场景
+   无需额外 CSS 即可正常显示 <Badge>。变量见 vars.css 的 --vp-badge-*。 */
+.VPBadge {
+  display: inline-block;
+  margin-inline-start: 0.125rem;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  padding: 0 0.625rem;
+  line-height: 1.8333333;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transform: translateY(-0.125rem);
+}
+
+.VPBadge.small {
+  padding: 0 0.375rem;
+  line-height: 1.8;
+  font-size: 0.625rem;
+  transform: translateY(-0.5rem);
+}
+
+.vp-doc h1 > .VPBadge,
+.vp-doc h2 > .VPBadge {
+  margin: 0;
+  margin-inline-start: 0.125rem;
+  vertical-align: middle;
+}
+
+.vp-doc h2 > .VPBadge {
+  padding: 0 0.5rem;
+}
+
+.vp-doc h3 > .VPBadge {
+  vertical-align: middle;
+}
+
+.vp-doc h4 > .VPBadge,
+.vp-doc h5 > .VPBadge,
+.vp-doc h6 > .VPBadge {
+  vertical-align: middle;
+  line-height: 1.5;
+}
+
+.VPBadge.info {
+  border-color: var(--vp-badge-info-border);
+  color: var(--vp-badge-info-text);
+  background-color: var(--vp-badge-info-bg);
+}
+
+.VPBadge.note {
+  border-color: var(--vp-badge-note-border);
+  color: var(--vp-badge-note-text);
+  background-color: var(--vp-badge-note-bg);
+}
+
+.VPBadge.tip {
+  border-color: var(--vp-badge-tip-border);
+  color: var(--vp-badge-tip-text);
+  background-color: var(--vp-badge-tip-bg);
+}
+
+.VPBadge.important {
+  border-color: var(--vp-badge-important-border);
+  color: var(--vp-badge-important-text);
+  background-color: var(--vp-badge-important-bg);
+}
+
+.VPBadge.caution {
+  border-color: var(--vp-badge-caution-border);
+  color: var(--vp-badge-caution-text);
+  background-color: var(--vp-badge-caution-bg);
+}
+
+.VPBadge.warning {
+  border-color: var(--vp-badge-warning-border);
+  color: var(--vp-badge-warning-text);
+  background-color: var(--vp-badge-warning-bg);
+}
+
+.VPBadge.danger {
+  border-color: var(--vp-badge-danger-border);
+  color: var(--vp-badge-danger-text);
+  background-color: var(--vp-badge-danger-bg);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  white-space: nowrap;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  overflow: hidden;
+}

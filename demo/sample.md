@@ -11,7 +11,7 @@ const features = ['标题锚点', '代码高亮', 'KaTeX 数学', 'Mermaid 图�
 # mdi2esm 能力全景
 
 > 本文件是 demo 的**独立 Markdown 源文件**。左侧可实时编辑，右侧渲染。
-> 它覆盖 mdi2esm 集成的全部能力：基础语法、容器、GitHub alerts、脚注、任务列表、emoji、CJK 混排、属性、目录、代码高亮、数学、图表、图片缩放，以及 Vue 组件（`<Badge>`）和 `<script setup>`。
+> 它覆盖 mdi2esm 集成的全部能力：基础语法、容器、GitHub alerts、脚注、任务列表、emoji、CJK 混排、属性、目录、代码高亮、数学、图表、图片缩放，以及宿主注入的 Vue 组件（`<Badge>`）和 `<script setup>`。
 
 ::: tip 关于本示例
 顶部用了 frontmatter（本段上方 `---` 包裹的 `title` / `description`）和一个 `<script setup>`，它们由 `createMarkdownComponent` 完整管线处理。下面的 `{{ greeting }}` 就是 setup 里定义的响应式文本：**{{ greeting }}**。
@@ -125,15 +125,14 @@ CJK friendly：这是**中文**加粗English混排，数字123与汉字相邻，
 ### 8.1 语法着色与行高亮
 
 ```js [示例.js] {1,3} :line-numbers=2
-// [!code highlight] 高亮这一行
 const a = 1;
-const b = 2; // [!code ++]
-const c = 3; // [!code focus]
-const d = 4; // [!code error]
-const e = 5; // [!code --]
+const b = 2;
+const c = 3;
+const d = 4;
+const e = 5;
 ```
 
-`[示例.js]` 给代码块加标题，`{1,3}` 高亮指定行，`:line-numbers=2` 从第 2 行开始编号。`// [!code ...]` 是 Shiki transformers 的 notation 标记。
+`[示例.js]` 给代码块加标题，`{1,3}` 高亮指定行，`:line-numbers=2` 从第 2 行开始编号。
 
 ### 8.2 代码组（多 Tab）
 
@@ -192,7 +191,7 @@ graph TD
 
 ## 12. Vue 组件（Badge）
 
-标题里的徽标（每个徽标独占一段，避免被 markdown-it 当成嵌套标签）：
+徽标由宿主提供：`demo/vp-badge.js` 定义 `VPBadge`，渲染后通过 `component.components` 注入管线（mdi2esm 不内置）。每个徽标独占一段，避免被 markdown-it 当成嵌套标签：
 
 <Badge text="new" type="tip"></Badge>
 
@@ -200,7 +199,7 @@ graph TD
 
 <Badge type="danger">插槽内容</Badge>
 
-`<Badge>` 由 `createMarkdownComponent` 注册为 Vue 组件，支持 `text` / `type` 与默认插槽。这类 HTML-in-Markdown 需要 Vue 运行时，纯 `renderMarkdown` + `innerHTML` 的挂载方式无法演示。
+`<Badge>` 支持 `text` / `type` 与默认插槽。这类 HTML-in-Markdown 需要 Vue 运行时，纯 `renderMarkdown` + `innerHTML` 的挂载方式无法演示。
 
 ## 12.1 自定义容器（config 驱动）
 

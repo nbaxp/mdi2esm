@@ -1,3 +1,8 @@
+// 宿主侧的徽标组件（复制自 mdoc 的 theme/components/VPBadge.js）。
+// mdi2esm 不再内置 Badge：宿主提供组件并在渲染后注入管线，
+// 注入代码见 index.html 里 createMarkdownComponent 之后的 component.components。
+import styleMixin from 'vue-style-runtime';
+
 const BADGE_CSS = `
 .VPBadge {
   display: inline-block;
@@ -88,10 +93,10 @@ const BADGE_CSS = `
 }
 `;
 
-// 1:1 移植 VitePress VPBadge.vue；Markdown 里的 <Badge> 由动态组件注册为 Badge，
-// 原版：https://github.com/vuejs/vitepress/blob/v2.0.0-alpha.21/src/client/theme-default/components/VPBadge.vue
-// 组件本身不注入样式；BADGE_CSS 由 badgeStyles 导出，宿主全局注入一次即可（见 README）。
+// 1:1 移植 VitePress VPBadge.vue（原版：
+// https://github.com/vuejs/vitepress/blob/v2.0.0-alpha.21/src/client/theme-default/components/VPBadge.vue）
 const VPBadge = {
+  mixins: [styleMixin],
   props: {
     text: { type: String, required: false },
     type: { type: String, required: false, default: 'tip' },
@@ -101,9 +106,9 @@ const VPBadge = {
       <slot>{{ text }}</slot>
     </span>
   `,
+  styles: /* HTML */ `<style scoped>
+    ${BADGE_CSS}
+  </style>`,
 };
 
-const badgeStyles = BADGE_CSS;
-
-export { badgeStyles };
-export default VPBadge;
+export { VPBadge };

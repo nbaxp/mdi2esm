@@ -6,91 +6,10 @@
     <title>mdi2esm demo</title>
     <!--
       全面 demo：示例源来自独立的 demo/sample.md（?raw 载入，可实时编辑）。
-      渲染走 createMarkdownComponent 完整管线（含 frontmatter、Shiki 高亮、KaTeX、Badge、script setup），
-      由 Vue createApp 挂载。样式复用 mdoc 的 VitePress 拷贝（demo/theme），
-      确保代码块着色 / 容器 / 排版 / 深浅主题与 mdoc 真实一致。
+      渲染走 createMarkdownComponent 完整管线（含 frontmatter、Prism 高亮、KaTeX、script setup），
+      由 Vue createApp 挂载。样式走 mdi2esm 自带的 src/styles/index.css。
+      本文件只保留页面骨架，逻辑见 demo/main.js，外壳样式见 demo/demo.css。
     -->
-    <style>
-      /* demo 外壳专用样式（demo- 前缀，避免与 VitePress 全局样式冲突） */
-      body {
-        background: var(--vp-c-bg);
-      }
-      .demo-header {
-        padding: 12px 20px;
-        border-bottom: 1px solid var(--vp-c-divider);
-        display: flex;
-        gap: 12px;
-        align-items: center;
-        position: sticky;
-        top: 0;
-        background: var(--vp-c-bg);
-        z-index: 10;
-      }
-      .demo-header strong {
-        font-size: 16px;
-      }
-      .demo-header span {
-        color: var(--vp-c-text-2);
-        font-size: 13px;
-      }
-      .demo-header button {
-        border: 1px solid var(--vp-c-divider);
-        background: var(--vp-c-bg-soft);
-        color: var(--vp-c-text-1);
-        border-radius: 6px;
-        padding: 4px 12px;
-        cursor: pointer;
-        font-size: 13px;
-      }
-      .demo-main {
-        display: grid;
-        grid-template-columns: 1fr 1fr 220px;
-        gap: 16px;
-        padding: 16px 20px;
-        align-items: start;
-      }
-      .demo-src {
-        width: 100%;
-        height: 78vh;
-        box-sizing: border-box;
-        font-family: var(--vp-font-family-mono);
-        font-size: 12px;
-        line-height: 1.6;
-        border: 1px solid var(--vp-c-divider);
-        border-radius: 8px;
-        padding: 12px;
-        background: var(--vp-c-bg-soft);
-        color: var(--vp-c-text-1);
-        resize: vertical;
-        tab-size: 2;
-      }
-      .demo-col-title {
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        color: var(--vp-c-text-2);
-        margin: 0 0 6px;
-      }
-      .demo-rendered {
-        border: 1px solid var(--vp-c-divider);
-        border-radius: 8px;
-        padding: 0 20px 20px;
-        overflow: auto;
-        height: 78vh;
-        background: var(--vp-c-bg);
-        color: var(--vp-c-text-1);
-      }
-      #outline a {
-        display: block;
-        color: var(--vp-c-text-2);
-        text-decoration: none;
-        font-size: 13px;
-        padding: 2px 0;
-      }
-      #outline a:hover {
-        color: var(--vp-c-brand-1);
-      }
-    </style>
   </head>
   <body>
     <header class="demo-header">
@@ -109,83 +28,10 @@
         <div id="content" class="demo-rendered vp-doc"></div>
       </section>
       <aside>
-        <p class="demo-col-title">大纲</p>
-        <nav id="outline"></nav>
+        <nav id="outline" class="vp-doc-outline"></nav>
       </aside>
     </main>
 
-    <script type="module">
-      // 完整 VitePress 样式（mdoc 拷贝）+ KaTeX 样式，由 Vite 打包进 assets
-      import './demo/theme/index.css';
-      import 'katex/dist/katex.min.css';
-      import { createApp, h } from 'vue';
-      // 独立 md 源文件，作为可编辑示例的初始值
-      import sample from './demo/sample.md?raw';
-      import { badgeStyles, buildOutline, createConfig, createMarkdownComponent } from './dist/index.min.js';
-
-      // 徽标样式由宿主注入（组件本身不注入）；用 <Badge> 前注入一次即可
-      const badgeStyleEl = document.createElement('style');
-      badgeStyleEl.textContent = badgeStyles;
-      document.head.appendChild(badgeStyleEl);
-
-      const ta = document.getElementById('src');
-      const outline = document.getElementById('outline');
-      ta.value = sample;
-
-      // 自定义容器：由 config 驱动（非纯 Markdown 语法），演示 ::: demo
-      const config = createConfig({
-        markdown: {
-          lineNumbers: false,
-          container: [{ type: 'demo', title: '自定义容器' }],
-        },
-      });
-
-      let app = null;
-
-      function renderOutline(items, container) {
-        for (const it of items) {
-          const a = document.createElement('a');
-          a.href = it.link;
-          a.textContent = it.title;
-          container.append(a);
-          if (it.children && it.children.length) {
-            const box = document.createElement('div');
-            box.style.paddingLeft = '12px';
-            renderOutline(it.children, box);
-            container.append(box);
-          }
-        }
-      }
-
-      async function run() {
-        // 完整管线：frontmatter / Shiki 高亮 / KaTeX / Badge / script setup / 容器 全部在此完成
-        const { component, headings } = await createMarkdownComponent(ta.value, '', config);
-        if (app) app.unmount();
-        const host = document.getElementById('content');
-        host.innerHTML = '';
-        if (component) {
-          app = createApp({
-            render: () => h(component),
-          });
-          app.mount(host);
-        }
-        outline.innerHTML = '';
-        renderOutline(buildOutline(headings), outline);
-      }
-
-      document.getElementById('render').addEventListener('click', () => {
-        run().catch((err) => {
-          document.getElementById('content').textContent = '渲染失败：' + err.message;
-          console.error(err);
-        });
-      });
-      document.getElementById('toggle-theme').addEventListener('click', () => {
-        document.documentElement.classList.toggle('dark');
-      });
-      run().catch((err) => {
-        document.getElementById('content').textContent = '渲染失败：' + err.message;
-        console.error(err);
-      });
-    </script>
+    <script type="module" src="./demo/main.js"></script>
   </body>
 </html>

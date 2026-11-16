@@ -14,7 +14,7 @@ export { ensureCustomContainers, default as md, render as renderSource } from '.
 // 兼容旧 mdoc 的 `import md from 'markdown-md.js'`（默认导出）写法
 export { applyCodeBlock, maskFenceMarkers, unmaskFenceMarkers } from './code-block.js';
 export { stripFrontmatter } from './frontmatter.js';
-export { highlightCodeBlocks } from './highlight.js';
+export { highlightCode, normalizeLang } from './highlight.js';
 export { mountImageZoom } from './image-zoom.js';
 export { default } from './markdown-it.js';
 export {
@@ -31,4 +31,3 @@ export { renderMath } from './math.js';
 export { mountMermaid } from './mermaid.js';
 export { createMarkdownComponent, extractTopLevelBlocks } from './pipeline.js';
 export { buildOutline, escapeInvalidInterpolations, renderMarkdown, resolvePath } from './render.js';
-export { badgeStyles, default as VPBadge } from './VPBadge.js';

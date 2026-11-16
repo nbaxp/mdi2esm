@@ -79,8 +79,6 @@
   --vp-c-red-2: #d5393e;
   --vp-c-red-3: #e0575b;
   --vp-c-red-soft: rgba(244, 63, 94, 0.14);
-
-  --vp-c-sponsor: #db2777;
 }
 
 .dark {
@@ -304,37 +302,6 @@
 }
 
 /**
- * Shadows
- * -------------------------------------------------------------------------- */
-
-:root {
-  --vp-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
-  --vp-shadow-2: 0 3px 12px rgba(0, 0, 0, 0.07), 0 1px 4px rgba(0, 0, 0, 0.07);
-  --vp-shadow-3: 0 12px 32px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.08);
-  --vp-shadow-4: 0 14px 44px rgba(0, 0, 0, 0.12), 0 3px 9px rgba(0, 0, 0, 0.12);
-  --vp-shadow-5: 0 18px 56px rgba(0, 0, 0, 0.16), 0 4px 12px rgba(0, 0, 0, 0.16);
-}
-
-/**
- * Z-indexes
- * -------------------------------------------------------------------------- */
-
-:root {
-  --vp-z-index-footer: 10;
-  --vp-z-index-local-nav: 20;
-  --vp-z-index-nav: 30;
-  --vp-z-index-layout-top: 40;
-  --vp-z-index-backdrop: 50;
-  --vp-z-index-sidebar: 60;
-}
-
-@media (min-width: 60rem) {
-  :root {
-    --vp-z-index-sidebar: 25;
-  }
-}
-
-/**
  * Direction
  * -------------------------------------------------------------------------- */
 
@@ -347,14 +314,6 @@
 [dir='rtl'] {
   --vp-direction-multiplier: -1;
   --vp-direction-mark: '\200F';
-}
-
-/**
- * Layouts
- * -------------------------------------------------------------------------- */
-
-:root {
-  --vp-layout-max-width: 90rem;
 }
 
 /**
@@ -410,42 +369,6 @@
 }
 
 /**
- * Component: Button
- * -------------------------------------------------------------------------- */
-
-:root {
-  --vp-button-brand-border: transparent;
-  --vp-button-brand-text: var(--vp-c-white);
-  --vp-button-brand-bg: var(--vp-c-brand-3);
-  --vp-button-brand-hover-border: transparent;
-  --vp-button-brand-hover-text: var(--vp-c-white);
-  --vp-button-brand-hover-bg: var(--vp-c-brand-2);
-  --vp-button-brand-active-border: transparent;
-  --vp-button-brand-active-text: var(--vp-c-white);
-  --vp-button-brand-active-bg: var(--vp-c-brand-1);
-
-  --vp-button-alt-border: transparent;
-  --vp-button-alt-text: var(--vp-c-text-1);
-  --vp-button-alt-bg: var(--vp-c-default-3);
-  --vp-button-alt-hover-border: transparent;
-  --vp-button-alt-hover-text: var(--vp-c-text-1);
-  --vp-button-alt-hover-bg: var(--vp-c-default-2);
-  --vp-button-alt-active-border: transparent;
-  --vp-button-alt-active-text: var(--vp-c-text-1);
-  --vp-button-alt-active-bg: var(--vp-c-default-1);
-
-  --vp-button-sponsor-border: var(--vp-c-text-2);
-  --vp-button-sponsor-text: var(--vp-c-text-2);
-  --vp-button-sponsor-bg: transparent;
-  --vp-button-sponsor-hover-border: var(--vp-c-sponsor);
-  --vp-button-sponsor-hover-text: var(--vp-c-sponsor);
-  --vp-button-sponsor-hover-bg: transparent;
-  --vp-button-sponsor-active-border: var(--vp-c-sponsor);
-  --vp-button-sponsor-active-text: var(--vp-c-sponsor);
-  --vp-button-sponsor-active-bg: transparent;
-}
-
-/**
  * Component: Custom Block
  * -------------------------------------------------------------------------- */
 
@@ -495,99 +418,7 @@
 }
 
 /**
- * Component: Input
- * -------------------------------------------------------------------------- */
-
-:root {
-  --vp-input-border-color: var(--vp-c-border);
-  --vp-input-bg-color: var(--vp-c-bg-alt);
-
-  --vp-input-switch-bg-color: var(--vp-c-default-soft);
-}
-
-/**
- * Component: Nav
- * -------------------------------------------------------------------------- */
-
-:root {
-  --vp-nav-height: 4rem;
-  --vp-nav-bg-color: var(--vp-c-bg);
-
-  /**
-   * Background while on top of the home page (unscrolled). Set it to
-   * var(--vp-nav-bg-color) to opt out of the transparent treatment.
-   */
-  --vp-nav-home-bg-color: transparent;
-
-  /**
-   * Applied to the navbar surface, e.g. `saturate(180%) blur(8px)` combined
-   * with a translucent --vp-nav-bg-color for a frosted-glass bar.
-   */
-  --vp-nav-backdrop-filter: none;
-
-  --vp-nav-divider-color: var(--vp-c-gutter);
-  --vp-nav-screen-bg-color: var(--vp-c-bg);
-  --vp-nav-logo-height: 1.5rem;
-}
-
-.hide-nav {
-  --vp-nav-height: 0px;
-}
-
-.hide-nav .VPSidebar {
-  --vp-nav-height: 1.375rem;
-}
-
-/**
- * Component: Local Nav
- * -------------------------------------------------------------------------- */
-
-:root {
-  /**
-   * Follows the navbar surface by default, so a translucent
-   * --vp-nav-bg-color with --vp-nav-backdrop-filter extends the
-   * frosted-glass treatment to the local nav as well.
-   */
-  --vp-local-nav-bg-color: var(--vp-nav-bg-color);
-
-  /**
-   * The local nav's bottom rule. Follows the navbar's divider color by
-   * default.
-   */
-  --vp-local-nav-divider-color: var(--vp-nav-divider-color);
-}
-
-/**
- * Component: Sidebar
- * -------------------------------------------------------------------------- */
-
-:root {
-  --vp-sidebar-width: 17rem;
-  --vp-sidebar-bg-color: var(--vp-c-bg-alt);
-}
-
-/**
- * Colors Backdrop
- * -------------------------------------------------------------------------- */
-
-:root {
-  --vp-backdrop-bg-color: rgba(0, 0, 0, 0.6);
-}
-
-/**
- * Component: Home
- * -------------------------------------------------------------------------- */
-
-:root {
-  --vp-home-hero-name-color: var(--vp-c-brand-1);
-  --vp-home-hero-name-background: transparent;
-
-  --vp-home-hero-image-background-image: none;
-  --vp-home-hero-image-filter: none;
-}
-
-/**
- * Component: Badge
+ * Component: Badge (host-provided component)
  * -------------------------------------------------------------------------- */
 
 :root {
@@ -618,30 +449,4 @@
   --vp-badge-danger-border: transparent;
   --vp-badge-danger-text: var(--vp-c-danger-1);
   --vp-badge-danger-bg: var(--vp-c-danger-soft);
-}
-
-/**
- * Component: Carbon Ads
- * -------------------------------------------------------------------------- */
-
-:root {
-  --vp-carbon-ads-text-color: var(--vp-c-text-1);
-  --vp-carbon-ads-poweredby-color: var(--vp-c-text-2);
-  --vp-carbon-ads-bg-color: var(--vp-c-bg-soft);
-  --vp-carbon-ads-hover-text-color: var(--vp-c-brand-1);
-  --vp-carbon-ads-hover-poweredby-color: var(--vp-c-text-1);
-}
-
-/**
-  * Component: Local Search
-  * -------------------------------------------------------------------------- */
-
-:root {
-  --vp-local-search-bg: var(--vp-c-bg);
-  --vp-local-search-result-bg: var(--vp-c-bg);
-  --vp-local-search-result-border: var(--vp-c-divider);
-  --vp-local-search-result-selected-bg: var(--vp-c-bg);
-  --vp-local-search-result-selected-border: var(--vp-c-brand-1);
-  --vp-local-search-highlight-bg: var(--vp-c-brand-1);
-  --vp-local-search-highlight-text: var(--vp-c-neutral-inverse);
 }

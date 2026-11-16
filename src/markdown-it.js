@@ -24,7 +24,7 @@ applyRestoreEntities(md);
 applyTablePlugin(md);
 
 // 官方 markdown.ts:458-524 的社区插件顺序；fence 不进 attrs，
-// 让 {1,3} / :line-numbers 等元信息原样交给 Shiki transformers
+// 让 {1,3} / :line-numbers 等元信息原样交给 Prism 行标记与行号插件
 md.use(attrs, {
   rule: ['inline', 'table', 'list', 'heading', 'hr', 'softbreak', 'blockInfo', 'blockEnd', 'tasklist'],
 });

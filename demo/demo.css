@@ -1,0 +1,85 @@
+/* demo 外壳专用样式（demo- 前缀，避免与 mdi2esm 的 .vp-doc 样式冲突）。
+   markdown 正文与页内目录的样式来自 src/styles/index.css，这里只负责页面骨架。 */
+
+body {
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+  font-family: var(--vp-font-family-base);
+}
+
+.demo-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg);
+}
+
+.demo-header strong {
+  font-size: 16px;
+}
+
+.demo-header span {
+  color: var(--vp-c-text-2);
+  font-size: 13px;
+}
+
+.demo-header button {
+  border: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.demo-main {
+  display: grid;
+  grid-template-columns: 1fr 1fr 220px;
+  gap: 16px;
+  padding: 16px 20px;
+  align-items: start;
+}
+
+.demo-col-title {
+  margin: 0 0 6px;
+  color: var(--vp-c-text-2);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.demo-src {
+  box-sizing: border-box;
+  width: 100%;
+  height: 78vh;
+  padding: 12px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  font-family: var(--vp-font-family-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  tab-size: 2;
+  resize: vertical;
+}
+
+.demo-rendered {
+  height: 78vh;
+  overflow: auto;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+}
+
+/* demo 的滚动容器没有吸顶导航，锚点偏移缩小到视觉舒适值 */
+.demo-rendered [id] {
+  scroll-margin-top: 12px;
+}
