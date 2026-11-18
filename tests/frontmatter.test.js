@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { stripFrontmatter } from '../src/index.js';
+import { parseFrontmatter, stripFrontmatter } from '../src/index.js';
 
 test('标准 frontmatter：顶部 --- 包裹 YAML', () => {
   assert.equal(stripFrontmatter('---\ntitle: 你好\n---\n# 正文'), '# 正文');
@@ -45,4 +45,50 @@ test('空 frontmatter：--- 紧跟 ---', () => {
 
 test('定界符行尾空白不阻碍剥离', () => {
   assert.equal(stripFrontmatter('---   \ntitle: T\n---  \n# 正文'), '# 正文');
+});
+
+test('parseFrontmatter 解析标量、数组与一层嵌套', () => {
+  const source = [
+    '---',
+    'title: 标题',
+    'order: 3',
+    'draft: false',
+    'tags: [a, b]',
+    'aside:',
+    '  - toc',
+    '  - ads',
+    'outline:',
+    '  level: [2, 3]',
+    '---',
+    '',
+    '# 正文',
+  ].join('\n');
+  const { body, data } = parseFrontmatter(source);
+  assert.equal(body, '\n# 正文');
+  assert.deepEqual(data, {
+    title: '标题',
+    order: 3,
+    draft: false,
+    tags: ['a', 'b'],
+    aside: ['toc', 'ads'],
+    outline: { level: [2, 3] },
+  });
+});
+
+test('parseFrontmatter 去引号并保留空字符串', () => {
+  const { data } = parseFrontmatter('---\ntitle: "带 \\"引号\\""\nempty: ""\nnil: null\n---\n');
+  assert.equal(data.title, '带 "引号"');
+  assert.equal(data.empty, '');
+  assert.equal(data.nil, null);
+});
+
+test('parseFrontmatter 无 frontmatter 时返回空对象', () => {
+  const { body, data } = parseFrontmatter('# 只有正文');
+  assert.equal(body, '# 只有正文');
+  assert.deepEqual(data, {});
+});
+
+test('parseFrontmatter 未闭合时不动原文', () => {
+  const source = '---\ntitle: T\n# 正文';
+  assert.deepEqual(parseFrontmatter(source), { body: source, data: {} });
 });

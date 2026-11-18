@@ -3,8 +3,10 @@
 import { anchor } from '@mdit/plugin-anchor';
 import { attrs } from '@mdit/plugin-attrs';
 import { container } from '@mdit/plugin-container';
-import { fullEmoji } from '@mdit/plugin-emoji';
 import { footnote } from '@mdit/plugin-footnote';
+import { mark } from '@mdit/plugin-mark';
+import { sub } from '@mdit/plugin-sub';
+import { sup } from '@mdit/plugin-sup';
 import { tasklist } from '@mdit/plugin-tasklist';
 import { tocPlugin } from '@mdit-vue/plugin-toc';
 import { slugify } from '@mdit-vue/shared';
@@ -13,7 +15,7 @@ import cjkFriendly from 'markdown-it-cjk-friendly';
 
 import { applyCodeBlock } from './code-block.js';
 import { CONTAINER_LABELS, DEFAULT_ADAPTERS } from './config.js';
-import { applyRestoreEntities, applyTablePlugin } from './markdown-plugins.js';
+import { applyRestoreEntities, applyTablePlugin, extractLang } from './markdown-plugins.js';
 
 const md = new MarkdownIt({ html: true, linkify: true });
 // 对齐 mdoc / VitePress：只认显式协议链接，裸域名不自动成链
@@ -28,10 +30,42 @@ applyTablePlugin(md);
 md.use(attrs, {
   rule: ['inline', 'table', 'list', 'heading', 'hr', 'softbreak', 'blockInfo', 'blockEnd', 'tasklist'],
 });
-md.use(fullEmoji);
 md.use(tasklist);
 md.use(footnote);
+md.use(mark);
+md.use(sub);
+md.use(sup);
 md.use(cjkFriendly);
+
+// 行内图标短码：`:i-集合-图标:` 翻成 <Icon>，组件由宿主注入——包内不持有组件、不内置图标集。
+// emoji 不在这里处理：交给 markdown-it-emoji（见 ensureEmojiPlugin），没装时 `:名字:` 保持原文。
+const ICON_SHORTCODE_RE = /^:i-([a-z0-9]+)-([a-z0-9-]+):/;
+
+md.inline.ruler.after('escape', 'icon_shortcode', (state, silent) => {
+  if (state.src.charCodeAt(state.pos) !== 0x3a /* : */) return false;
+  const match = ICON_SHORTCODE_RE.exec(state.src.slice(state.pos, state.posMax));
+  if (!match) return false;
+  if (!silent) {
+    const token = state.push('icon_shortcode', '', 0);
+    // 短码用连字符分段，Iconify 的图标名用冒号分段
+    token.content = `${match[1]}:${match[2]}`;
+  }
+  state.pos += match[0].length;
+  return true;
+});
+
+// 属性值只可能含 [a-z0-9:+_-]，无需再转义；标签由 Vue 模板编译成宿主注入的组件
+md.renderer.rules.icon_shortcode = (tokens, idx) => `<Icon icon="${tokens[idx].content}" />`;
+
+// emoji：用 markdown-it-emoji（不内置）——宿主提供了就启用（full 数据，GitHub / VitePress 同套），
+// 没装时动态 import 失败，静默回退，`:名字:` 按普通文本原样保留。
+// 插件挂载是异步的：管线的 createMarkdownComponent 会在首次渲染前 await（见 pipeline.js），
+// 直接用 renderMarkdown / render 的调用点在插件就绪前渲染到的是原文，之后的渲染自动带上 emoji。
+let emojiReady;
+export function ensureEmojiPlugin() {
+  emojiReady ??= import('markdown-it-emoji').then((emoji) => md.use(emoji.full)).catch(() => {});
+  return emojiReady;
+}
 
 // 标题锚点：permalink 对齐官方 .header-anchor 与 aria-label，顺带收集 h2/h3 供目录
 md.use(anchor, {
@@ -39,7 +73,7 @@ md.use(anchor, {
   tabIndex: false,
   getTokensText: (tokens) =>
     tokens
-      .filter((token) => !['html_inline', 'emoji'].includes(token.type))
+      .filter((token) => !['html_inline', 'icon_shortcode'].includes(token.type))
       .map((token) => token.content)
       .join(''),
   permalink: (slug, _options, state, idx) => {
@@ -49,8 +83,10 @@ md.use(anchor, {
       .filter((token) => token.type === 'text' || token.type === 'code_inline')
       .map((token) => token.content)
       .join('')
-      .trim()
-      .replaceAll('&amp;', '&');
+      .replaceAll('&amp;', '&')
+      // 标题里夹了组件/短码时，两侧文本各自带空格，合并成单个空格
+      .replace(/\s+/g, ' ')
+      .trim();
     const level = Number(state.tokens[idx].tag.slice(1));
     // 收集 h2-h6（h1 为页面标题不进目录）；AppToc 暂仍从渲染后 DOM 收集
     if (level >= 2) state.env.headings?.push({ level, title, slug });
@@ -79,17 +115,6 @@ const CONTAINER_NAMES = ['tip', 'info', 'warning', 'danger', 'details', 'note', 
 
 // 文案由宿主壳经 config → env 注入，渲染层不再按目录猜语言
 const labelsOf = (env) => env?.containerLabels ?? CONTAINER_LABELS.zh;
-
-// 对齐 vitepress dist 的 extractLang：js-vue/js、vue-html→template、ansi→空
-function extractLang(info) {
-  return (
-    /^[a-zA-Z0-9-_]+/
-      .exec(info)?.[0]
-      .replace(/-vue$/, '')
-      .replace(/^vue-html$/, 'template')
-      .replace(/^ansi$/, '') || ''
-  );
-}
 
 // 对齐 vitepress dist 的 extractTitle：优先 [标题]，其次语言名，最后 txt
 function extractTitle(info, isHtml = false) {
@@ -304,6 +329,22 @@ const renderMathPlaceholder = (display) => (tokens, idx) => {
 };
 md.renderer.rules.math_inline = renderMathPlaceholder(false);
 md.renderer.rules.math_block = renderMathPlaceholder(true);
+
+// 语法糖开关：mark / sub / sup 默认开启，config.markdown.*: false 时在首次渲染前移除规则。
+// 与自定义容器一样，开关按实例生效（md 是单例，不支持同一进程内多套配置共存）。
+const SYNTAX_RULES = { mark: ['mark_='], sub: ['sub_~'], sup: ['sup_^'] };
+let syntaxConfigured = false;
+
+export function ensureSyntaxPlugins(config) {
+  if (syntaxConfigured) return;
+  syntaxConfigured = true;
+  const options = config?.markdown ?? {};
+  for (const [name, rules] of Object.entries(SYNTAX_RULES)) {
+    if (options[name] === false) {
+      for (const rule of rules) md.inline.ruler.disable(rule);
+    }
+  }
+}
 
 // 自定义容器：名字必须在 parse 前注册，故由 renderMarkdown 在首次渲染前用当前 config 注册（幂等）
 const registeredCustomContainers = new Set();

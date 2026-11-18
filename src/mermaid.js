@@ -1,21 +1,20 @@
-// Mermaid 图形（移植自 mdoc）：挂载后直接替换真实 DOM；
-// Vue 模板编译会丢弃 SVG 内嵌 <style>，所以不能在模板字符串里渲染
-// 配色从页面 CSS 变量取值，亮/暗切换（html.dark）时重新 initialize 并重绘
-const mermaidTheme = () => (document.documentElement.classList.contains('dark') ? 'dark' : 'default');
-let mermaidModule;
-let mermaidObserver;
+// ```mermaid 代码块 → <MermaidBlock> 组件（fence 规则见 ./code-block.js）。
+// 走组件而不是「挂载后扫 document」：作用域就是组件自己的根节点，多实例互不干扰。
+// SVG 只能经 innerHTML 写进真实 DOM——Vue 模板编译会丢掉 SVG 内嵌的 <style>。
+import { h, onMounted, onUnmounted, shallowRef, watch } from 'vue';
+
+let mermaidPromise;
 let mermaidCount = 0;
 
-async function loadMermaid() {
-  mermaidModule ??= import('mermaid').catch(() => null);
-  return mermaidModule;
-}
+const loadMermaid = () => (mermaidPromise ??= import('mermaid').catch(() => null));
+const isDark = () => document.documentElement.classList.contains('dark');
 
 const cssVar = (name, fallback) => {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   return value || fallback;
 };
 
+// 配色从页面 CSS 变量取，宿主换主题不用改库
 function mermaidConfig() {
   const bg = cssVar('--vp-c-bg', '#ffffff');
   const bgSoft = cssVar('--vp-c-bg-soft', bg);
@@ -28,7 +27,7 @@ function mermaidConfig() {
     startOnLoad: false,
     theme: 'base',
     themeVariables: {
-      darkMode: mermaidTheme() === 'dark',
+      darkMode: isDark(),
       background: bg,
       primaryColor: bgSoft,
       primaryTextColor: text1,
@@ -53,52 +52,62 @@ function mermaidConfig() {
   };
 }
 
-async function paintMermaid(targets, module) {
-  if (targets.length === 0) return;
-  const mermaid = module?.default ?? module;
-  // 每次重绘都重新 initialize，避免沿用首次的主题配置
-  mermaid.initialize(mermaidConfig());
-  for (const target of targets) {
-    const source =
-      target.getAttribute('data-mermaid-source') ?? target.querySelector('.mermaid-source')?.textContent ?? '';
-    try {
-      await mermaid.parse(source);
-      const { svg } = await mermaid.render(`md-mermaid-${(mermaidCount += 1)}`, source);
-      const wrapper = document.createElement('div');
-      wrapper.className = 'mermaid-rendered';
-      wrapper.setAttribute('data-mermaid-source', source);
-      wrapper.innerHTML = svg;
-      target.replaceWith(wrapper);
-    } catch (err) {
-      console.warn('[markdown-it] Mermaid 渲染失败，保留源码：', err);
+export const MermaidBlock = {
+  name: 'MermaidBlock',
+  props: {
+    // fence 里 encodeURIComponent 过，避免引号、换行把模板属性搞坏
+    graph: { type: String, required: true },
+  },
+  setup(props) {
+    const source = () => decodeURIComponent(props.graph);
+    const svg = shallowRef('');
+    const id = `md-mermaid-${(mermaidCount += 1)}`;
+    let theme = '';
+    let observer;
+    let seq = 0;
+
+    async function paint() {
+      const current = ++seq;
+      const module = await loadMermaid();
+      if (current !== seq) return;
+      if (!module) {
+        console.warn('[mdi2esm] Mermaid 加载失败，保留源码');
+        return;
+      }
+      const mermaid = module.default ?? module;
+      theme = isDark() ? 'dark' : 'default';
+      // 字体没就绪时量出来的文本宽度偏，等它
+      await document.fonts?.ready;
+      if (current !== seq) return;
+      mermaid.initialize(mermaidConfig());
+      try {
+        await mermaid.parse(source());
+        const { svg: next } = await mermaid.render(id, source());
+        if (current === seq) svg.value = next;
+      } catch (err) {
+        console.warn('[mdi2esm] Mermaid 渲染失败，保留源码：', err);
+      }
     }
-  }
-}
 
-function watchMermaidTheme(module) {
-  if (mermaidObserver) return;
-  let theme = mermaidTheme();
-  mermaidObserver = new MutationObserver(() => {
-    const next = mermaidTheme();
-    if (next === theme) return;
-    theme = next;
-    paintMermaid([...document.querySelectorAll('.mermaid-rendered')], module).catch(() => {});
-  });
-  mermaidObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-}
+    onMounted(() => {
+      // 主题切换（html.dark）重绘，只认 class 的实际变化
+      observer = new MutationObserver(() => {
+        if ((isDark() ? 'dark' : 'default') === theme) return;
+        paint();
+      });
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+      paint();
+    });
 
-// 组件挂载后调用：等两帧确保主题 CSS 变量与字体就绪，再替换源码占位
-export async function mountMermaid(targets = document.querySelectorAll('.mermaid-block')) {
-  const list = Array.from(targets);
-  if (list.length === 0) return;
-  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  await document.fonts?.ready;
+    onUnmounted(() => observer?.disconnect());
 
-  const module = await loadMermaid();
-  if (!module) {
-    console.warn('[markdown-it] Mermaid 加载失败，保留源码');
-    return;
-  }
-  watchMermaidTheme(module);
-  await paintMermaid(list, module);
-}
+    // 同一位置被复用时 graph 会变，要重画
+    watch(() => props.graph, paint);
+
+    // 渲染出来之前（以及失败时）显示源码，不留空白
+    return () =>
+      svg.value
+        ? h('div', { class: 'mermaid-rendered', innerHTML: svg.value })
+        : h('pre', { class: 'mermaid-source' }, source());
+  },
+};

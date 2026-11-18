@@ -1,20 +1,14 @@
 // mdi2esm 自身的 fence 渲染：DOM 外壳对齐 VitePress preWrapper（button.copy + span.lang + pre）。
+// 复制与 code-group 切换的点击委托也在这里：文档级一次委托（对齐 VitePress copyCode/codeGroups），
+// 换剪贴板策略或改 tab 行为时改这一个文件即可，宿主零配置。
 import { wrapCodeLines } from './code-lines.js';
 import { highlightCode } from './highlight.js';
-import { applyLineNumbers, fenceMetaAttrs } from './markdown-plugins.js';
+import { applyLineNumbers, extractLang, fenceMetaAttrs } from './markdown-plugins.js';
 
-// 代码块外层包装：对齐 VitePress preWrapper 的 DOM（button.copy + span.lang + pre）
-function extractLang(info) {
-  return (
-    /^[a-zA-Z0-9-_]+/
-      .exec(info)?.[0]
-      .replace(/-vue$/, '')
-      .replace(/^vue-html$/, 'template')
-      .replace(/^ansi$/, '') || ''
-  );
-}
+const COPY_RESET_MS = 2000;
+const copyTimers = new WeakMap();
 
-// 复制按钮：非安全上下文或权限被拒时退回 textarea + execCommand
+// 非安全上下文或权限被拒时退回 textarea + execCommand
 async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
@@ -30,11 +24,8 @@ async function copyText(text) {
     element.style.contain = 'strict';
     element.style.position = 'absolute';
     element.style.insetInlineStart = '-9999px';
-    element.style.fontSize = '12pt';
-    document.body.appendChild(element);
+    document.body.append(element);
     element.select();
-    element.selectionStart = 0;
-    element.selectionEnd = text.length;
     const ok = document.execCommand('copy');
     element.remove();
     if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
@@ -43,9 +34,6 @@ async function copyText(text) {
     return false;
   }
 }
-
-const COPY_RESET_MS = 2000;
-const copyTimers = new WeakMap();
 
 function copyCode(button) {
   const pre = button.parentElement?.querySelector('pre');
@@ -98,7 +86,7 @@ function onCodeBlockClick(event) {
 
 // @mdit/plugin-container 的闭合扫描基于原始行，围栏里的 ::: 会被误判成容器闭合。
 // 渲染前给围栏内以 : 开头的行插入私有区占位符，渲染后还原，代码显示不受影响
-const FENCE_MASK = '';
+const FENCE_MASK = '\uE000'; // 显式写法，避免源码里的隐形字符被误改成空串
 
 export function maskFenceMarkers(source) {
   const lines = source.split('\n');
@@ -121,15 +109,17 @@ export function maskFenceMarkers(source) {
 
 export const unmaskFenceMarkers = (html) => html.split(FENCE_MASK).join('');
 
-// 将 preWrapper / v-pre / 行号 注册到给定的 markdown-it 实例（由 markdown-md.js 调用，避免循环依赖）
+// 把 preWrapper / v-pre / 行号注册到给定的 markdown-it 实例（独立成模块，避免与 markdown-it.js 循环依赖）
 export function applyCodeBlock(md) {
   // markdown-it 的 fence 默认规则会调用 options.highlight；Prism 是同步的，
   // 因此高亮可以直接发生在渲染期，不再需要渲染后的 DOM 替换。
   md.options.highlight = (code, lang) => highlightCode(code, lang) ?? md.utils.escapeHtml(code);
 
   function wrapPre(html, token, env) {
+    // ```mermaid 转成组件标签：SVG 由组件自己写进 DOM（模板编译会丢 SVG 里的 <style>），
+    // 源码 encodeURIComponent 后再进属性，引号和换行不会破坏模板
     if (extractLang(token.info) === 'mermaid') {
-      return `<div class="mermaid-block"><pre class="mermaid-source" v-pre>${md.utils.escapeHtml(token.content)}</pre></div>\n`;
+      return `<MermaidBlock graph="${encodeURIComponent(token.content)}"></MermaidBlock>\n`;
     }
     const lineMeta = fenceMetaAttrs(token.info);
     token.info = token.info.replace(/\[.*\]/, '');

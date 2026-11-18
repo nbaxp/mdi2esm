@@ -6,20 +6,27 @@ import {
   buildSetupModuleSource,
   CONTAINER_LABELS,
   COPY_LABELS,
+  createBaseAdapters,
   createConfig,
-  createMdocAdapters,
   createRenderEnv,
   DEFAULT_ADAPTERS,
   DEFAULT_CONFIG,
 } from '../src/index.js';
 
-const ADAPTER_KEYS = ['toHref', 'toSrc', 'anchorHref', 'toScriptImport', 'scriptContext', 'katexCss'];
+const ADAPTER_KEYS = ['toHref', 'toSrc', 'anchorHref', 'toScriptImport', 'scriptContext'];
 
 test('配置：schema 与默认预设', () => {
   assert.deepEqual(Object.keys(DEFAULT_ADAPTERS).sort(), [...ADAPTER_KEYS].sort());
   assert.equal(DEFAULT_CONFIG.locale, 'zh');
-  assert.deepEqual(DEFAULT_CONFIG.outline, [2, 3]);
-  assert.deepEqual(DEFAULT_CONFIG.markdown, { lineNumbers: false, math: true, container: [] });
+  assert.deepEqual(DEFAULT_CONFIG.markdown, {
+    lineNumbers: false,
+    math: true,
+    mark: true,
+    sub: true,
+    sup: true,
+    container: [],
+    frontmatterParser: null,
+  });
 });
 
 test('配置：createConfig 合并覆盖并按 locale 选文案', () => {
@@ -29,11 +36,16 @@ test('配置：createConfig 合并覆盖并按 locale 选文案', () => {
   assert.deepEqual(createConfig({ markdown: { math: false } }).markdown, {
     lineNumbers: false,
     math: false,
+    mark: true,
+    sub: true,
+    sup: true,
     container: [],
+    frontmatterParser: null,
   });
   const custom = createConfig({ adapters: { anchorHref: () => '#x' } });
   assert.equal(custom.adapters.anchorHref('a'), '#x');
-  assert.equal(custom.adapters.toHref, DEFAULT_ADAPTERS.toHref);
+  // 只覆写声明的那个，其余仍走 base 生成的默认实现
+  assert.equal(custom.adapters.toHref({ path: 'a.md', resolved: 'a.md', hash: '' }), '/a');
 });
 
 test('渲染 env：暴露 adapters / labels / headings', () => {
@@ -75,11 +87,20 @@ test('脚本：scriptContext 注入 frontmatter / params', () => {
   assert.match(source, /return \{ t: t \};/);
 });
 
-test('适配器：katexCss 默认不注入（esm 全局样式）', () => {
-  assert.equal(DEFAULT_ADAPTERS.katexCss(), null);
-  assert.equal(createConfig().adapters.katexCss(), null);
+test('适配器：base 编进 adapters，配置上不出现 base 字段', () => {
+  const config = createConfig({ base: '/doc/' });
+  assert.equal('base' in config, false);
+  assert.equal(config.adapters.toHref({ path: './a.md', resolved: 'guide/a.md', hash: '#x' }), '/doc/guide/a#x');
+  // 根部署与默认适配器完全等价
+  assert.deepEqual(Object.keys(createBaseAdapters('/')), Object.keys(DEFAULT_ADAPTERS));
+  assert.equal(createConfig().adapters.toHref({ path: './a.md', resolved: 'guide/a.md', hash: '' }), '/guide/a');
 });
 
-test('适配器：esm 与 mdoc 预设键一致', () => {
-  assert.deepEqual(Object.keys(createMdocAdapters()).sort(), Object.keys(DEFAULT_ADAPTERS).sort());
+test('适配器：子路径下相对/绝对路径都带上 base', () => {
+  const { toSrc, toScriptImport } = createBaseAdapters('/doc');
+  assert.equal(toSrc({ src: 'a.png', resolved: 'guide/a.png' }), '/doc/guide/a.png');
+  assert.equal(toSrc({ src: '/img/a.png', resolved: '/img/a.png' }), '/doc/img/a.png');
+  assert.equal(toScriptImport({ spec: './h.js', resolved: 'guide/h.js' }), '/doc/guide/h.js');
+  assert.equal(toScriptImport({ spec: '/abs.js', resolved: '' }), '/doc/abs.js');
+  assert.equal(toScriptImport({ spec: 'vue', resolved: '' }), 'vue');
 });

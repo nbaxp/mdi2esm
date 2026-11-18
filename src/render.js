@@ -1,10 +1,8 @@
 // Markdown 渲染管线：共享 markdown-it 实例 + 通用链接重写。
-// URL 拼装与锚点形态由 config.adapters 提供，标题锚点由 ./setup.js 的官方 anchor 插件生成
+// URL 拼装与锚点形态由 config.adapters 提供，标题锚点由 markdown-it.js 里的官方 anchor 插件生成
 import { createRenderEnv, DEFAULT_ADAPTERS } from './config.js';
-import md, { ensureCustomContainers } from './markdown-it.js';
+import md, { ensureCustomContainers, ensureSyntaxPlugins } from './markdown-it.js';
 import { normalizeHash } from './markdown-plugins.js';
-
-export { md };
 
 // 路径解析：'guide/./a.md' → 'guide/a.md'，处理 './' 与 '../'
 export const resolvePath = (base, rel) => {
@@ -123,6 +121,7 @@ export function buildOutline(headings) {
 export function renderMarkdown(body, { dir = '', config } = {}) {
   const env = createRenderEnv(config, { dir });
   ensureCustomContainers(env.config);
+  ensureSyntaxPlugins(env.config);
   const html = md.render(body.replace(IMAGE_SIZE_PRE, '$1=$2)'), env);
   return { html, headings: env.headings };
 }

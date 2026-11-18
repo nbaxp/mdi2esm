@@ -8,6 +8,7 @@ import html from '@html-eslint/eslint-plugin';
 import { defineConfig, globalIgnores, includeIgnoreFile } from 'eslint/config';
 import prettier from 'eslint-plugin-prettier/recommended';
 import simpleImportSort from 'eslint-plugin-simple-import-sort';
+import pluginVue from 'eslint-plugin-vue';
 import globals from 'globals';
 
 export default defineConfig([
@@ -39,6 +40,13 @@ export default defineConfig([
       'spaced-comment': ['error', 'always'],
     },
   },
+
+  // Vue SFC：只取 essential（正确性规则），排版交给 prettier
+  // essential/rules 那一条不带 files，必须补上，否则会作用到 .css/.md 上
+  ...pluginVue.configs['flat/essential'].map((config) => ({
+    ...config,
+    files: config.files ?? ['**/*.vue'],
+  })),
 
   // CSS
   {

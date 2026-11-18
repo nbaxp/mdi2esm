@@ -1,8 +1,8 @@
 // 行切分：把 Prism 输出的扁平 HTML 按物理行拆开，跨行的 token 在换行处闭合、下一行重开。
 // markdown 的 fence 渲染与独立代码块组件共用这一份实现，避免两处规则漂移。
 
-// {1,3,5-7} → 行号集合（1 基）
-export function parseHighlightLines(meta) {
+// {1,3,5-7} → 行号集合（1 基）；只在 wrapLines 内部用
+function parseHighlightLines(meta) {
   const match = /\{([\d,\s-]+)\}/.exec(meta ?? '');
   if (!match) return null;
   const lines = new Set();
@@ -15,7 +15,7 @@ export function parseHighlightLines(meta) {
   return lines;
 }
 
-export function splitHtmlLines(html) {
+function splitHtmlLines(html) {
   const lines = [];
   const stack = [];
   let current = '';

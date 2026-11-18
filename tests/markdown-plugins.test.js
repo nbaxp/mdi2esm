@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import MarkdownIt from 'markdown-it';
 
-import { applyLineNumbers, fenceMetaAttrs, normalizeHash, renderMarkdown } from '../src/index.js';
+import { applyLineNumbers, ensureEmojiPlugin, fenceMetaAttrs, normalizeHash, renderMarkdown } from '../src/index.js';
 
 test('官方 anchor 插件：id / .header-anchor / 中文 slug / outline 收集', () => {
   const { html, headings } = renderMarkdown('## 小节 abc\n\n正文');
@@ -26,12 +26,33 @@ test('官方 toc 插件：[[toc]] 生成与 anchor 一致的链接', () => {
   assert.match(html, /<li><a href="#子节">子节<\/a><\/li><\/ul><\/li><\/ul><\/nav>/);
 });
 
-test('官方 emoji / footnote / tasklist / cjk 插件：对应 DOM 与行内脚注', () => {
-  const { html } = renderMarkdown(':tada: **中文**粗体 行内脚注^[note]\n\n- [x] 完成');
-  assert.match(html, /<p>🎉 <strong>中文<\/strong>粗体 行内脚注<sup class="footnote-ref">/);
+test('官方 footnote / tasklist / cjk 插件：对应 DOM 与行内脚注', () => {
+  const { html } = renderMarkdown('**中文**粗体 行内脚注^[note]\n\n- [x] 完成');
+  assert.match(html, /<p><strong>中文<\/strong>粗体 行内脚注<sup class="footnote-ref">/);
   assert.match(html, /<section class="footnotes">/);
   assert.match(html, /<ul class="task-list-container">/);
   assert.match(html, /class="task-list-item-checkbox" checked="checked" disabled="disabled"/);
+});
+
+test('emoji：markdown-it-emoji（full 数据）把 :名字: 翻成字符，图标短码不受影响', async () => {
+  // emoji 插件不内置：动态 import 挂载（幂等），测试环境装了 devDependency，await 等它挂上
+  await ensureEmojiPlugin();
+  const { html } = renderMarkdown(':i-mdi-home: 和 :i-demo-spark: 以及 :tada: :+1: :100:');
+  assert.match(html, /<p><Icon icon="mdi:home" \/> 和 <Icon icon="demo:spark" \/> 以及 🎉 👍 💯<\/p>/);
+});
+
+test('emoji：:i-foo: 与时间、版本号、行内代码保持原文', () => {
+  const { html } = renderMarkdown(':i-foo: 时间 12:30:00，版本 1:2:3，行内 `:tada:` 保持原样');
+  assert.ok(html.includes(':i-foo:'));
+  assert.ok(html.includes('12:30:00'));
+  assert.ok(html.includes('1:2:3'));
+  assert.ok(html.includes('<code v-pre>:tada:</code>'));
+});
+
+test('短码：标题里出现短码时 title/slug 不带短码原文', () => {
+  const { headings } = renderMarkdown('## 图标 :i-mdi-home: 示例');
+  assert.equal(headings[0].title, '图标 示例');
+  assert.equal(headings[0].slug, '图标-示例');
 });
 
 test('官方 table 插件：表格可键盘聚焦', () => {

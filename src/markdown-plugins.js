@@ -67,6 +67,16 @@ export const fenceMetaAttrs = (info) => {
     : '';
 };
 
+// 官方 extractLang：fence / code-group 的 info 首段是语言名，
+// `js-vue`→`js`、`vue-html`→`template`、`ansi`→空。code-group 取 tab 标题与
+// fence 外壳都要用同一套归一化，所以只留这一份实现
+export const extractLang = (info) =>
+  /^[a-zA-Z0-9-_]+/
+    .exec(info ?? '')?.[0]
+    .replace(/-vue$/, '')
+    .replace(/^vue-html$/, 'template')
+    .replace(/^ansi$/, '') || '';
+
 // 官方 lineNumbers.ts：依赖 code-block.js 的 preWrapper，必须在其后注册。
 // enable 为显式覆盖（供独立实例测试）；不传时逐次从 env.config.markdown.lineNumbers 读取
 export function applyLineNumbers(md, enable) {

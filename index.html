@@ -5,22 +5,159 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>mdi2esm demo</title>
     <!--
-      全面 demo：示例源来自独立的 demo/sample.md（?raw 载入，可实时编辑）。
-      渲染走 createMarkdownComponent 完整管线（含 frontmatter、Prism 高亮、KaTeX、script setup），
-      由 Vue createApp 挂载。样式走 mdi2esm 自带的 src/styles/index.css。
-      本文件只保留页面骨架，逻辑见 demo/main.js，外壳样式见 demo/demo.css。
+      demo 页面：整页自包含，样式与脚本内联在本文件。
+      - dev（npm run dev）：Vite 服务本文件，内联脚本里的裸导入（mdi2esm / vue / …）由 Vite
+        重写到源码与 node_modules——引用全是非 dist 内容。
+      - build（npm run build）：Vite 把本文件当入口打进 dist/，所有导入解析成打包产物，
+        dist 自包含，`npm run preview` 或直接发布 GitHub Pages 都能跑，无需 importmap。
+      - 渲染走 <MarkdownContent>（完整管线：frontmatter、Prism 高亮、KaTeX、script setup）。
+      - 左列 textarea 编辑，右列实时预览（输入防抖 400ms），「渲染」按钮强制刷新，最右是大纲。
     -->
+    <link rel="stylesheet" href="./src/styles/index.css" />
+    <link rel="stylesheet" href="./node_modules/katex/dist/katex.min.css" />
+    <style>
+      /* demo 外壳专用样式（demo- 前缀，避免与 mdi2esm 的 .vp-doc 样式冲突）。
+         markdown 正文与页内目录的样式来自库的 index.css，这里只负责页面骨架。 */
+      body {
+        background: var(--vp-c-bg);
+        color: var(--vp-c-text-1);
+        font-family: var(--vp-font-family-base);
+      }
+
+      .demo-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--vp-c-divider);
+        background: var(--vp-c-bg);
+      }
+
+      .demo-header strong {
+        font-size: 16px;
+      }
+
+      .demo-header span {
+        color: var(--vp-c-text-2);
+        font-size: 13px;
+      }
+
+      .demo-header button {
+        border: 1px solid var(--vp-c-divider);
+        background: var(--vp-c-bg-soft);
+        color: var(--vp-c-text-1);
+        border-radius: 6px;
+        padding: 4px 12px;
+        cursor: pointer;
+        font-size: 13px;
+      }
+
+      .demo-main {
+        display: grid;
+        grid-template-columns: 1fr 1fr 220px;
+        gap: 16px;
+        padding: 16px 20px;
+        align-items: start;
+      }
+
+      .demo-col-title {
+        margin: 0 0 6px;
+        color: var(--vp-c-text-2);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .demo-src {
+        box-sizing: border-box;
+        width: 100%;
+        height: 78vh;
+        padding: 12px;
+        border: 1px solid var(--vp-c-divider);
+        border-radius: 8px;
+        background: var(--vp-c-bg-soft);
+        color: var(--vp-c-text-1);
+        font-family: var(--vp-font-family-mono);
+        font-size: 12px;
+        line-height: 1.6;
+        tab-size: 2;
+        resize: vertical;
+      }
+
+      .demo-rendered {
+        height: 78vh;
+        overflow: auto;
+        border: 1px solid var(--vp-c-divider);
+        border-radius: 8px;
+        background: var(--vp-c-bg);
+        color: var(--vp-c-text-1);
+      }
+
+      /* demo 的滚动容器没有吸顶导航，锚点偏移缩小到视觉舒适值 */
+      .demo-rendered [id] {
+        scroll-margin-top: 12px;
+      }
+
+      /* 短码生成的 <Icon> 是 svg：doc.css 里 svg 按块级排（图片语义），
+         行内图标要跟随文字，这里在 demo 侧补一条，不影响库样式 */
+      .vp-doc p svg,
+      .vp-doc li > svg,
+      .vp-doc h2 svg,
+      .vp-doc h3 svg {
+        display: inline-block;
+        vertical-align: -0.125em;
+      }
+
+      /* 自定义容器：库只产出 .demo.custom-block 的结构（border 透明、无背景），
+         配色属于宿主主题，库不内置未知类型的色板。这里给 demo 用品牌色做示例 */
+      .vp-doc .custom-block.demo {
+        border-color: var(--vp-c-brand-1);
+        background-color: var(--vp-c-brand-soft);
+      }
+
+      .vp-doc .custom-block.demo .custom-block-title {
+        color: var(--vp-c-brand-1);
+      }
+
+      /* 图片放大：medium-zoom 的遮罩跟随主题，宿主自己装、自己管样式 */
+      .medium-zoom-overlay {
+        background: var(--vp-c-bg) !important;
+        z-index: 100;
+      }
+
+      .medium-zoom-image--opened {
+        z-index: 101;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "vue": "./node_modules/vue/dist/vue.esm-browser.prod.js",
+          "vue-style-runtime": "./node_modules/vue-style-runtime/index.js",
+          "mdi2esm": "./index.min.js",
+          "@iconify/vue": "./node_modules/@iconify/vue/dist/iconify.mjs",
+          "katex": "./node_modules/katex/dist/katex.mjs",
+          "mermaid": "./node_modules/mermaid/dist/mermaid.esm.min.mjs",
+          "medium-zoom": "./node_modules/medium-zoom/dist/medium-zoom.esm.js",
+          "markdown-it-emoji": "./node_modules/markdown-it-emoji/index.mjs",
+          "markdown-it-emoji/lib/data/full.mjs": "./node_modules/markdown-it-emoji/lib/data/full.mjs"
+        }
+      }
+    </script>
   </head>
   <body>
     <header class="demo-header">
       <strong>mdi2esm</strong>
-      <span>全面 demo · 独立 md 源 · 完整渲染管线</span>
+      <span>全面 demo · Vite dev/preview · 左编辑右预览</span>
       <button id="render">渲染</button>
       <button id="toggle-theme">深色</button>
     </header>
     <main class="demo-main">
       <section>
-        <p class="demo-col-title">Markdown 源（demo/sample.md）</p>
+        <p class="demo-col-title">Markdown 源（README.md，可编辑）</p>
         <textarea id="src" class="demo-src" spellcheck="false"></textarea>
       </section>
       <section>
@@ -32,6 +169,279 @@
       </aside>
     </main>
 
-    <script type="module" src="./demo/main.js"></script>
+    <script type="module">
+      // ===== demo 全部逻辑（原 demo/vp-badge.js + demo/main.js，内联成单文件页面） =====
+
+      // 宿主侧的徽标组件（复制自 mdoc 的 theme/components/VPBadge.js）。
+      // mdi2esm 不内置 Badge：宿主提供组件，经 <MarkdownContent> 的 components 属性注入。
+      // 1:1 移植 VitePress VPBadge.vue（原版：
+      // https://github.com/vuejs/vitepress/blob/v2.0.0-alpha.21/src/client/theme-default/components/VPBadge.vue）
+      import styleMixin from 'vue-style-runtime';
+
+      const BADGE_CSS = `
+.VPBadge {
+  display: inline-block;
+  margin-inline-start: 0.125rem;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  padding: 0 0.625rem;
+  line-height: 1.8333333;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transform: translateY(-0.125rem);
+}
+
+.VPBadge.small {
+  padding: 0 0.375rem;
+  line-height: 1.8;
+  font-size: 0.625rem;
+  transform: translateY(-0.5rem);
+}
+
+.VPDocFooter .VPBadge {
+  display: none;
+}
+
+.vp-doc h1 > .VPBadge,
+.vp-doc h2 > .VPBadge {
+  margin: 0;
+  margin-inline-start: 0.125rem;
+  vertical-align: middle;
+}
+
+.vp-doc h2 > .VPBadge {
+  padding: 0 0.5rem;
+}
+
+.vp-doc h3 > .VPBadge {
+  vertical-align: middle;
+}
+
+.vp-doc h4 > .VPBadge,
+.vp-doc h5 > .VPBadge,
+.vp-doc h6 > .VPBadge {
+  vertical-align: middle;
+  line-height: 1.5;
+}
+
+.VPBadge.info {
+  border-color: var(--vp-badge-info-border);
+  color: var(--vp-badge-info-text);
+  background-color: var(--vp-badge-info-bg);
+}
+
+.VPBadge.note {
+  border-color: var(--vp-badge-note-border);
+  color: var(--vp-badge-note-text);
+  background-color: var(--vp-badge-note-bg);
+}
+
+.VPBadge.tip {
+  border-color: var(--vp-badge-tip-border);
+  color: var(--vp-badge-tip-text);
+  background-color: var(--vp-badge-tip-bg);
+}
+
+.VPBadge.important {
+  border-color: var(--vp-badge-important-border);
+  color: var(--vp-badge-important-text);
+  background-color: var(--vp-badge-important-bg);
+}
+
+.VPBadge.caution {
+  border-color: var(--vp-badge-caution-border);
+  color: var(--vp-badge-caution-text);
+  background-color: var(--vp-badge-caution-bg);
+}
+
+.VPBadge.warning {
+  border-color: var(--vp-badge-warning-border);
+  color: var(--vp-badge-warning-text);
+  background-color: var(--vp-badge-warning-bg);
+}
+
+.VPBadge.danger {
+  border-color: var(--vp-badge-danger-border);
+  color: var(--vp-badge-danger-text);
+  background-color: var(--vp-badge-danger-bg);
+}
+`;
+
+      const VPBadge = {
+        mixins: [styleMixin],
+        props: {
+          text: { type: String, required: false },
+          type: { type: String, required: false, default: 'tip' },
+        },
+        template: /* HTML */ `
+          <span class="VPBadge" :class="type" dir="auto">
+            <slot>{{ text }}</slot>
+          </span>
+        `,
+        styles: /* HTML */ `<style scoped>
+          ${BADGE_CSS}
+        </style>`,
+      };
+
+      // ===== 页面主体 =====
+      import { Icon } from '@iconify/vue';
+      import { buildOutline, createConfig, MarkdownContent } from 'mdi2esm';
+      import { createApp, h, nextTick, shallowRef } from 'vue';
+
+      // 注入的唯一入口：md 里用到的 <Icon> / <Badge> 全在这里登记，库内一个都不含。
+      // Icon 来自 Iconify；VPBadge 是宿主自己写的组件（内联在本文件上方）。
+      const HOST_COMPONENTS = { Icon, Badge: VPBadge };
+
+      const ta = document.getElementById('src');
+      const content = document.getElementById('content');
+      const outline = document.getElementById('outline');
+
+      // README.md 既是包文档，也是本 demo 可编辑示例的初始值；运行时取，不靠构建期内联
+      // 示例源：dev 取根目录 README.md（源码实时可改），build 后取 dist/demo.md
+      //（换名是为了避开 npm files 白名单，见 scripts/build.mjs 第 4 步）
+      const readme = await fetch(import.meta.env.DEV ? './README.md' : './demo.md').then((res) => res.text());
+      ta.value = readme;
+
+      // 自定义容器：由 config 驱动（非纯 Markdown 语法），演示 ::: demo
+      const config = createConfig({
+        markdown: {
+          lineNumbers: false,
+          container: [{ type: 'demo', title: '自定义容器' }],
+        },
+      });
+
+      // 页面唯一的 Vue 状态：md 文本。改它就会重新编译，其余都由 <MarkdownContent> 内部处理
+      const source = shallowRef(readme);
+
+      let marker = null;
+      let spyLinks = [];
+      let spyTargets = [];
+      let spyRaf = 0;
+
+      // 大纲层级交给 .vp-doc-outline .lvl-N 控制，不写内联样式
+      function renderOutline(items, container, level = 2) {
+        for (const it of items) {
+          const a = document.createElement('a');
+          a.href = it.link;
+          a.textContent = it.title;
+          a.className = `lvl-${Math.min(level, 4)}`;
+          a.dataset.target = it.link.slice(1);
+          container.append(a);
+          renderOutline(it.children || [], container, level + 1);
+        }
+      }
+
+      // 与 VitePress 的 .outline-title 对齐
+      function createTitle(container) {
+        const title = document.createElement('div');
+        title.className = 'vp-doc-outline-title';
+        title.textContent = '大纲';
+        container.append(title);
+      }
+
+      // 与 VitePress 的 .outline-marker 对齐：独立元素，由 JS 定位到当前项
+      function createMarker(container) {
+        marker = document.createElement('div');
+        marker.className = 'outline-marker';
+        container.append(marker);
+      }
+
+      // 滚动同步：取最后一个越过容器顶部的标题，对应链接打上 .active
+      function collectOutlineTargets() {
+        spyLinks = [...outline.querySelectorAll('a')];
+        spyTargets = spyLinks.map((a) => document.getElementById(a.dataset.target));
+      }
+
+      function updateActive() {
+        spyRaf = 0;
+        if (!spyLinks.length) return;
+        const threshold = content.getBoundingClientRect().top + 16;
+        let index = 0;
+        for (let i = 0; i < spyTargets.length; i += 1) {
+          const el = spyTargets[i];
+          if (el && el.getBoundingClientRect().top <= threshold) index = i;
+        }
+        spyLinks.forEach((a, i) => a.classList.toggle('active', i === index));
+
+        const active = spyLinks[index];
+        if (!active) return;
+        if (marker) {
+          marker.style.top = `${active.offsetTop + (active.offsetHeight - marker.offsetHeight) / 2}px`;
+          marker.style.opacity = '1';
+        }
+        // 目录自身滚动时把当前项带回视野
+        const viewTop = outline.scrollTop;
+        const viewBottom = viewTop + outline.clientHeight;
+        if (active.offsetTop < viewTop) {
+          outline.scrollTop = active.offsetTop;
+        } else if (active.offsetTop + active.offsetHeight > viewBottom) {
+          outline.scrollTop = active.offsetTop + active.offsetHeight - outline.clientHeight;
+        }
+      }
+
+      function scheduleActive() {
+        if (spyRaf) return;
+        spyRaf = requestAnimationFrame(updateActive);
+      }
+
+      content.addEventListener('scroll', scheduleActive, { passive: true });
+      window.addEventListener('resize', scheduleActive);
+
+      // <MarkdownContent> 编译完抛出的 headings：右侧大纲就地重建
+      async function onHeadings(headings) {
+        outline.innerHTML = '';
+        createTitle(outline);
+        createMarker(outline);
+        renderOutline(buildOutline(headings), outline);
+        // 标题元素要等 MarkdownContent 把内容 patch 进 DOM 才取得到
+        await nextTick();
+        collectOutlineTargets();
+        scheduleActive();
+      }
+
+      // 整个页面只有一个 Vue 应用：一个标签 + 三个属性，不再手工调 createMarkdownComponent
+      const Root = {
+        setup() {
+          return () =>
+            h(MarkdownContent, {
+              source: source.value,
+              config,
+              components: HOST_COMPONENTS,
+              onHeadings,
+            });
+        },
+      };
+
+      function fail(err) {
+        content.textContent = '渲染失败：' + err.message;
+        console.error(err);
+      }
+
+      // 挂载后由 <MarkdownContent> 接管：文本变了就重编译，大纲由 onHeadings 重建
+      try {
+        createApp(Root).mount(content);
+      } catch (err) {
+        fail(err);
+      }
+
+      // 左编辑右预览：输入防抖 400ms 实时刷新，文本没变时 shallowRef 不触发，不会白跑编译
+      let inputTimer = 0;
+      ta.addEventListener('input', () => {
+        clearTimeout(inputTimer);
+        inputTimer = setTimeout(() => {
+          source.value = ta.value;
+        }, 400);
+      });
+
+      // 「渲染」按钮：跳过防抖立即刷新
+      document.getElementById('render').addEventListener('click', () => {
+        clearTimeout(inputTimer);
+        source.value = ta.value;
+      });
+      document.getElementById('toggle-theme').addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+      });
+    </script>
   </body>
 </html>

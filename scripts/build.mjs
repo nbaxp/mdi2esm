@@ -1,9 +1,14 @@
 // 用 Vite 8（rolldown 打包，依赖里无 esbuild）构建 mdi2esm。产出：
-//   dist/index.js      —— 完整打包版（未压缩，便于调试）
-//   dist/index.min.js  —— 完整打包版（压缩，供生产使用）
-//   dist/index.html    —— demo 页（包根 index.html 经 Vite 构建，自动 bundle 所有 peer，无需 importmap/vendor）
+//   dist/index.js         —— 完整打包版（未压缩，便于调试）
+//   dist/index.min.js     —— 完整打包版（压缩，供生产使用）
+//   dist/index.css        —— 库样式（未压缩）
+//   dist/index.min.css    —— 库样式（压缩）
+//   dist/index.html 等    —— demo 页面（Vite 应用构建产物，自包含，可直接发布 GitHub Pages）
+// demo 构建与 dev 共用 vite.config.mjs 的插件与别名：index.html 里的 'mdi2esm' 打包为
+// 同一份源码的产物（库本体另出 index.js/index.min.js 供 npm 包），所有依赖打进 dist，
+// 无 importmap、无 node_modules 依赖。
 // 完整打包版内联 markdown 核心栈（markdown-it / @mdit* / @mdit-vue）与 Prism；其余框架与重依赖
-// （vue / vue-style-runtime / katex / mermaid / medium-zoom）外部化为 peer，
+// （vue / vue-style-runtime / katex / mermaid）外部化为 peer，
 // 由消费方提供，避免重复实例与体积膨胀。
 import fs from 'node:fs';
 import path from 'node:path';
@@ -12,14 +17,16 @@ import { fileURLToPath } from 'node:url';
 import { bundle } from 'lightningcss';
 import { build } from 'vite';
 
+import { createBaseConfig } from '../vite.config.mjs';
+
 const here = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(here, '..'); // packages/mdi2esm
+const root = path.resolve(here, '..'); // 包根目录
 
 const dist = path.join(root, 'dist');
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(dist, { recursive: true });
 
-const peerBare = ['@iconify/vue', 'vue', 'vue-style-runtime', 'katex', 'mermaid', 'medium-zoom'];
+const peerBare = ['@iconify/vue', 'vue', 'vue-style-runtime', 'katex', 'mermaid', 'medium-zoom', 'markdown-it-emoji'];
 const isExternal = (id) => peerBare.includes(id);
 // 核心栈依赖（被内联）装在本包 node_modules，Vite 默认即可解析，无需 alias
 
@@ -32,6 +39,11 @@ async function main() {
     await build({
       configFile: false,
       logLevel: 'warn',
+      // demo 的静态资源在后面步骤处理，这里不让 Vite 去复制 public/
+      publicDir: false,
+      // src/markdown-content.vue 走 SFC 编译：组件自身不再依赖运行时模板编译，
+      // 剩下的 compile() 只用于 md 转出来的模板（消费方仍需完整版 Vue）
+      plugins: [createBaseConfig().plugins],
       build: {
         outDir: dist,
         emptyOutDir: false,
@@ -52,32 +64,7 @@ async function main() {
     });
   }
 
-  // 2) demo 构建：标准 Vite 布局——包根 index.html 为入口，输出到 dist。
-  //    index.html 从 ./dist/index.min.js、./src/styles/*.css 与 peer 引入，Vite 从本包 node_modules 解析并 bundle。
-  await build({
-    configFile: false,
-    root,
-    base: './',
-    logLevel: 'warn',
-    // demo 走 createMarkdownComponent，运行时用 compile() 编译 Markdown 生成的 template，
-    // 必须 alias 到含完整编译器的构建（runtime 版 compile 是占位 stub，会抛错）。
-    resolve: {
-      alias: { vue: 'vue/dist/vue.esm-bundler.js' },
-    },
-    define: {
-      __VUE_OPTIONS_API__: 'true',
-      __VUE_PROD_DEVTOOLS__: 'false',
-      __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: 'false',
-    },
-    build: {
-      outDir: dist,
-      emptyOutDir: false,
-      target: 'es2020',
-      rollupOptions: { input: path.join(root, 'index.html') },
-    },
-  });
-
-  // 3) 独立样式：src/styles/index.css → dist/index.css / dist/index.min.css
+  // 2) 独立样式：src/styles/index.css → dist/index.css / dist/index.min.css（npm 包用）
   for (const [name, minify] of [
     ['index.css', false],
     ['index.min.css', true],
@@ -85,6 +72,30 @@ async function main() {
     const { code } = bundle({ filename: path.join(root, 'src', 'styles', 'index.css'), minify });
     fs.writeFileSync(path.join(dist, name), code);
   }
+
+  // 3) demo 页面：Vite 应用构建。index.html 是入口，所有裸导入（'mdi2esm' 经 alias 指到
+  //    源码）与 <link> 样式（含 KaTeX 字体）全部打进 dist，产物自包含。
+  await build({
+    configFile: false,
+    logLevel: 'warn',
+    publicDir: false, // public/ 原样拷贝即可，走第 4 步
+    ...createBaseConfig(),
+    base: './', // 相对路径引资产，gh-pages 任意子路径都能跑
+    build: {
+      outDir: dist,
+      emptyOutDir: false,
+      target: 'es2020',
+      rollupOptions: {
+        input: path.join(root, 'index.html'),
+      },
+    },
+  });
+
+  // 4) 运行时 fetch 的示例源与静态资源。示例源在 dist 里叫 demo.md：
+  //    package.json 的 files 白名单按名字匹配会把 dist/README.md 也带进 npm 包，
+  //    换名后根 README.md（包文档）进包、dist/demo.md（演示源）只留在 gh-pages 产物里。
+  fs.copyFileSync(path.join(root, 'README.md'), path.join(dist, 'demo.md'));
+  fs.cpSync(path.join(root, 'public'), path.join(dist, 'public'), { recursive: true });
 
   console.log('built ->', path.relative(root, dist));
 }

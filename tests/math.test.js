@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import md from '../src/index.js';
+import md, { renderMath } from '../src/index.js';
 
 test('行内公式：输出行内占位标记', () => {
   const html = md.render('公式 $x^2$ 结束');
@@ -43,4 +43,18 @@ test('未闭合块级公式：保留字面量，不吞后文', () => {
   assert.doesNotMatch(html, /md-math-placeholder/);
   assert.match(html, /\$\$/);
   assert.match(html, /abc/);
+});
+
+test('renderMath：只替换占位符，不改写其余模板（自闭合标签不被嵌套/小写化）', async () => {
+  const source =
+    '<Icon icon="a" />\n<Icon icon="b" />\n' +
+    '<span class="md-math-placeholder" data-display="false" data-tex="x^2"></span>\n' +
+    '<p>after</p>';
+  const out = await renderMath(source);
+  // 公式已渲染
+  assert.match(out, /class="katex"/);
+  assert.doesNotMatch(out, /md-math-placeholder/);
+  // 非公式部分逐字保留：防止 innerHTML round-trip 吞掉后续内容的关键保证
+  assert.ok(out.includes('<Icon icon="a" />\n<Icon icon="b" />\n'));
+  assert.ok(out.includes('<p>after</p>'));
 });

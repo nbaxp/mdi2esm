@@ -4,12 +4,12 @@ import { compile, defineComponent, markRaw } from 'vue';
 import { styleMixin } from 'vue-style-runtime';
 
 import { maskFenceMarkers, unmaskFenceMarkers } from './code-block.js';
-import { stripFrontmatter } from './frontmatter.js';
-import { Icon } from './icons.js';
+import { parseFrontmatter } from './frontmatter.js';
 import { mountImageZoom } from './image-zoom.js';
+import { ensureEmojiPlugin } from './markdown-it.js';
 import { createScriptModule, createSetup } from './markdown-script.js';
 import { renderMath } from './math.js';
-import { mountMermaid } from './mermaid.js';
+import { MermaidBlock } from './mermaid.js';
 import { escapeInvalidInterpolations, renderMarkdown } from './render.js';
 
 // 剥离第一个顶级的 <script>（页面级脚本，围栏内的不动），style 块全部剥离经 styleMixin 注入组件。
@@ -72,7 +72,7 @@ function mergeScriptOptions(options, def) {
   delete rest.render;
   delete rest.template;
   Object.assign(options, rest);
-  // script 自带 mounted 时排在管线 mounted（mermaid/图片缩放初始化）之后
+  // script 自带 mounted 时排在管线 mounted（图片缩放初始化）之后
   if (typeof mounted === 'function') {
     const pipelineMounted = options.mounted;
     options.mounted = function () {
@@ -80,15 +80,6 @@ function mergeScriptOptions(options, def) {
       mounted.call(this);
     };
   }
-}
-
-// 图标组件解析：默认不注册，`<Icon>` 由宿主全局提供；
-// icons: true 用包内异步 Icon，传组件定义则直接使用
-function resolveIconComponent(config = {}) {
-  const { icons } = config;
-  if (icons === true) return Icon;
-  if (icons && (typeof icons === 'object' || typeof icons === 'function')) return icons;
-  return null;
 }
 
 /**
@@ -99,27 +90,32 @@ function resolveIconComponent(config = {}) {
  * @returns {Promise<object|null>} 组件定义；空正文返回 null
  */
 export async function createMarkdownComponent(source, dir, config, { frontmatter, params } = {}) {
-  const iconComponent = resolveIconComponent(config);
-  const { body, scripts, styles } = extractTopLevelBlocks(stripFrontmatter(source));
+  // frontmatter：宿主显式传入优先，否则用（可替换的）内置子集解析器
+  const parse = config?.markdown?.frontmatterParser ?? parseFrontmatter;
+  const parsed = parse(source);
+  const data = frontmatter ?? parsed.data;
+  const { body, scripts, styles } = extractTopLevelBlocks(parsed.body);
+  // markdown-it-emoji 不内置：装了就挂上（幂等），没装静默跳过，渲染结果不受影响
+  await ensureEmojiPlugin();
   const { html, headings } = renderMarkdown(maskFenceMarkers(body), { dir, config });
-  const withMath = await renderMath(unmaskFenceMarkers(html), config);
+  const withMath = await renderMath(unmaskFenceMarkers(html));
   if (!body.trim()) return { component: null, headings: [] };
 
   const options = {
-    name: 'MarkdownContent',
+    // 不给 name：这是每份 md 一次性编出来的渲染组件，和 <MarkdownContent> 同名只会在 devtools 里混淆
     // 把 frontmatter 挂到实例，使模板里的 {{ $frontmatter.xxx }} 可用
     beforeCreate() {
-      this.$frontmatter = frontmatter ?? {};
+      this.$frontmatter = data ?? {};
     },
     render: compile(escapeInvalidInterpolations(withMath)),
+    // ```mermaid 渲染成 <MermaidBlock>，图形由组件自己画，管线不碰 DOM
     components: {
       ClientOnly: { template: '<slot />' },
-      ...(iconComponent ? { Icon: iconComponent } : {}),
+      MermaidBlock,
     },
-    // mermaid 图形在挂载后写入真实 DOM，避免 Vue 编译丢弃 SVG 内的 <style>
-    mounted() {
-      mountMermaid().catch(() => {});
-      mountImageZoom().catch(() => {});
+    // 图片缩放：medium-zoom 动态加载，仅当正文有可放大图片时挂载
+    async mounted() {
+      await mountImageZoom().catch(() => {});
     },
   };
   // 普通 <script>：默认导出选项对象（components/data/methods…）并入组件，正文即可用其注册的组件标签
@@ -135,7 +131,7 @@ export async function createMarkdownComponent(source, dir, config, { frontmatter
   }
   // <script setup>：拼成 ESM 模块执行，导出的绑定可直接在正文模板里使用；失败降级为无脚本渲染
   try {
-    const setup = await createSetup(scripts, dir, frontmatter, params, config);
+    const setup = await createSetup(scripts, dir, data, params, config);
     if (setup) options.setup = setup;
   } catch (err) {
     console.warn('[mdi2esm] <script setup> 执行失败：', err);

@@ -1,5 +1,4 @@
 // Markdown 渲染配置：宿主壳是唯一注入点，渲染层只读 config，不猜宿主环境。
-// 与 mdoc 侧 utils/markdown-config.js 同 schema（此处为 esm 预设），阶段 2 抽包后合并为 mdi2esm/src/config.js。
 
 // 容器提示文案：VitePress 官方 locales[].container 的中英文默认值
 export const CONTAINER_LABELS = {
@@ -31,35 +30,50 @@ export const COPY_LABELS = {
   zh: { tooltipText: '复制代码', copiedText: '已复制' },
 };
 
-// schema 一次定型；字段在 1c-1d 分批接入渲染层
+// 只有渲染层真正读取的字段才在这里：其余站点级路径（base / docRoot / themeBase 等）
+// 属于宿主壳，包内不读，也就不该出现在默认配置里
 export const DEFAULT_CONFIG = {
   locale: 'zh',
-  outline: [2, 3],
-  base: '/',
-  assetPrefix: '',
-  libPath: '/lib/',
-  docRoot: '/',
-  themeBase: '/',
-  // 图标组件：默认 false = 不注册，`<Icon>` 走宿主全局注册（推荐）；
-  // true = 用包内异步 Icon；对象/函数 = 直接用该组件定义
-  icons: false,
-  markdown: { lineNumbers: false, math: true, container: [] },
+  // mark / sub / sup：`==高亮==`、`H~2~O`、`x^2^`，置 false 关闭
+  markdown: {
+    lineNumbers: false,
+    math: true,
+    mark: true,
+    sub: true,
+    sup: true,
+    container: [],
+    frontmatterParser: null,
+  },
 };
 
-// 宿主适配器：渲染层只做通用处理（外链、锚点归一化、路径解析），URL 拼装交给宿主预设。
-// esm 预设；mdoc 预设见 markdown-config.js，阶段 2 合并为包的 presets。
-export const DEFAULT_ADAPTERS = {
-  toHref: ({ path, resolved, hash }) => {
-    const isDoc = /\.md$/i.test(path) || !/\.[a-z0-9]+$/i.test(path);
-    return `/${isDoc ? resolved.replace(/\.md$/i, '') : resolved}${hash}`;
-  },
-  toSrc: ({ src, resolved }) => (src.startsWith('/') ? src : `/${resolved}`),
-  anchorHref: (slug) => `#${slug}`,
-  toScriptImport: ({ spec, resolved }) => (spec.startsWith('.') ? `/${resolved}` : spec),
-  scriptContext: ({ frontmatter, params }) => ({ frontmatter: frontmatter ?? {}, params: params ?? {} }),
-  // KaTeX CSS：esm 由组件样式全局载入，无需运行时注入（返回 null）
-  katexCss: () => null,
-};
+// 宿主适配器：渲染层只做通用处理（外链、锚点归一化、路径解析），
+// URL 拼装只认 base 一个参数——根部署、子路径部署、mdoc 嵌套部署走同一条路。
+// 有非标准规则时，宿主在自己的 adapters 里覆写单个函数，createConfig 负责合并。
+export function createBaseAdapters(base = '/') {
+  const root = base.endsWith('/') ? base : `${base}/`;
+  const prefix = root.slice(0, -1); // '' 或 '/doc'
+  return {
+    toHref: ({ path, resolved, hash }) => {
+      const isDoc = /\.md$/i.test(path) || !/\.[a-z0-9]+$/i.test(path);
+      return `${prefix}/${isDoc ? resolved.replace(/\.md$/i, '') : resolved}${hash}`;
+    },
+    toSrc: ({ src, resolved }) => {
+      if (/^[a-z]+:/i.test(src) || src.startsWith('//')) return src; // data: / 外链
+      if (src.startsWith('/')) return `${prefix}${src}`;
+      return `${prefix}/${resolved}`;
+    },
+    anchorHref: (slug) => `#${slug}`,
+    toScriptImport: ({ spec, resolved }) => {
+      if (spec.startsWith('.')) return `${prefix}/${resolved}`;
+      if (spec.startsWith('/')) return `${prefix}${spec}`;
+      return spec;
+    },
+    scriptContext: ({ frontmatter, params }) => ({ frontmatter: frontmatter ?? {}, params: params ?? {} }),
+  };
+}
+
+// 根部署的适配器，作为渲染层没拿到 config 时的兜底
+export const DEFAULT_ADAPTERS = createBaseAdapters('/');
 
 const localeKey = (locale) =>
   String(locale ?? '')
@@ -68,8 +82,9 @@ const localeKey = (locale) =>
     ? 'en'
     : 'zh';
 
-// 合并宿主覆盖：locale 决定默认文案，宿主可用 labels / adapters 覆盖整套预设
-export function createConfig(overrides = {}) {
+// 合并宿主覆盖：base 在这里编成 adapters，配置对象上不出现 base 字段；
+// locale 决定默认文案，宿主可用 labels / adapters 覆盖
+export function createConfig({ base = '/', adapters, ...overrides } = {}) {
   const locale = overrides.locale ?? DEFAULT_CONFIG.locale;
   const key = localeKey(locale);
   return {
@@ -81,7 +96,7 @@ export function createConfig(overrides = {}) {
       container: overrides.labels?.container ?? CONTAINER_LABELS[key],
       copy: overrides.labels?.copy ?? COPY_LABELS[key],
     },
-    adapters: { ...DEFAULT_ADAPTERS, ...overrides.adapters },
+    adapters: { ...createBaseAdapters(base), ...adapters },
   };
 }
 
@@ -95,45 +110,5 @@ export function createRenderEnv(config = createConfig(), page = {}) {
     containerLabels: config.labels.container,
     copyLabels: config.labels.copy,
     headings: [],
-  };
-}
-
-// esm 预设：根部署，KaTeX 由组件样式全局载入（katexCss 返回 null）
-export function createEsmAdapters() {
-  return DEFAULT_ADAPTERS;
-}
-
-// mdoc 预设：带 BASE 的嵌套部署，资源走 /public，KaTeX CSS 按 LIB_PATH 注入
-export function createMdocAdapters({ base = '/', libPath = '/lib/' } = {}) {
-  const PUBLIC_ASSET_RE = /\.(svg|png|jpe?g|gif|webp|mp4|webm|avif|ico|woff2?)(?:[?#]|$)/i;
-  const toPublicSrc = (src) => {
-    if (!src || !src.startsWith('/')) return src;
-    if (/^(https?:|mailto:|#)/i.test(src)) return src;
-    if (src.startsWith(base)) src = src.slice(base.length - 1);
-    if (src.startsWith('/public/')) src = src.slice('/public'.length);
-    else if (src.startsWith('/assets/')) src = src.slice('/assets'.length);
-    if (!PUBLIC_ASSET_RE.test(src)) return src;
-    return base.slice(0, -1) + '/public' + src;
-  };
-  const toRoute = (p) => {
-    const noExt = p.replace(/\.md$/i, '');
-    if (noExt.toLowerCase() === 'index') return '/';
-    if (noExt.toLowerCase().endsWith('/index')) return '/' + noExt.slice(0, -'index'.length);
-    return '/' + noExt;
-  };
-  return {
-    toHref: ({ path, resolved, hash }) =>
-      /\.(md|html)$/i.test(path)
-        ? base.slice(0, -1) + toRoute(resolved.replace(/\.(md|html)$/i, '')) + hash
-        : base + resolved + hash,
-    toSrc: ({ src, resolved }) => toPublicSrc(src.startsWith('/') ? src : base + resolved),
-    anchorHref: (slug) => `#${slug}`,
-    toScriptImport: ({ spec, resolved }) => {
-      if (spec.startsWith('.')) return base + resolved;
-      if (spec.startsWith('/')) return base.slice(0, -1) + spec;
-      return spec;
-    },
-    scriptContext: ({ frontmatter, params }) => ({ frontmatter: frontmatter ?? {}, params: params ?? {} }),
-    katexCss: () => libPath + 'katex/katex.min.css',
   };
 }

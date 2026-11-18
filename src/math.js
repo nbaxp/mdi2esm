@@ -1,7 +1,5 @@
-// KaTeX 公式渲染（移植自 mdoc）：入口只产出占位标记，这里按需加载并替换
-// katex 与其 CSS 由 importmap / 调用方提供；CSS 路径由 config.adapters.katexCss 决定
-import { DEFAULT_ADAPTERS } from './config.js';
-
+// KaTeX 公式渲染：入口只产出占位标记，这里按需加载 katex 并替换。
+// katex 本体与它的 CSS 都由调用方提供——样式由宿主自己 import，库不注入 <link>。
 let katexModule;
 
 async function loadKatex() {
@@ -9,60 +7,49 @@ async function loadKatex() {
   return katexModule;
 }
 
-function ensureKatexCss(href) {
-  if (!href) return;
-  if (document.head.querySelector('link[data-md-katex]')) return;
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = href;
-  link.setAttribute('data-md-katex', '');
-  document.head.append(link);
+// 解码 md.utils.escapeHtml 对 TeX 做的实体转义（& < > " '）。
+// ' 由 escapeHtml 也编码为 &#39;，这里一并覆盖。
+function decodeAttr(value) {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
 }
 
-export async function renderMath(html, config) {
+// 占位符形状由 markdown-it.js 固定产出：
+//   <div class="md-math-placeholder" data-display="true" data-tex="..."></div>
+//   <span class="md-math-placeholder" data-display="false" data-tex="..."></span>
+// data-tex 已经过 escapeHtml，内部不会再出现裸的 `"`。
+const PLACEHOLDER_RE = /<(div|span) class="md-math-placeholder" data-display="(true|false)" data-tex="([^"]*)"><\/\1>/g;
+
+export async function renderMath(html) {
   if (!html.includes('class="md-math-placeholder"')) return html;
-  const adapters = config?.adapters ?? DEFAULT_ADAPTERS;
-  ensureKatexCss(adapters.katexCss?.(config));
-  const container = document.createElement('div');
-  container.innerHTML = html;
-  const targets = Array.from(container.querySelectorAll('.md-math-placeholder'));
 
   const katex = await loadKatex();
   const renderToString = katex?.renderToString ?? katex?.default?.renderToString;
   if (!renderToString) {
     console.warn('[markdown-it] KaTeX 加载失败，公式按原始文本渲染');
-    for (const element of targets) element.replaceWith(document.createTextNode(element.dataset.tex ?? ''));
-    return container.innerHTML;
+    return html.replace(PLACEHOLDER_RE, (_m, _tag, _display, tex) => decodeAttr(tex));
   }
 
-  for (const element of targets) {
-    const display = element.dataset.display === 'true';
-    const tex = element.dataset.tex ?? '';
+  // 只替换占位符字符串本身，绝不对整段模板做 innerHTML round-trip：
+  // 后者会让浏览器重新解析 HTML，把自闭合自定义标签（如 <Icon />）当成未闭合
+  // 开始标签层层嵌套并小写化，静默吞掉后续内容。
+  return html.replace(PLACEHOLDER_RE, (_m, _tag, displayAttr, texEncoded) => {
+    const display = displayAttr === 'true';
+    const tex = decodeAttr(texEncoded);
     let out;
     try {
       out = renderToString(tex, { displayMode: display, throwOnError: false, strict: 'ignore' });
     } catch (err) {
       console.warn('[markdown-it] KaTeX 渲染失败：', tex, err);
-      const fallback = document.createElement('span');
-      fallback.className = 'katex-error';
-      fallback.textContent = tex;
-      element.replaceWith(fallback);
-      continue;
+      return `<span class="katex-error">${tex}</span>`;
     }
     if (out.includes('katex-error')) console.warn('[markdown-it] KaTeX 解析失败：', tex);
-    const holder = document.createElement('div');
-    holder.innerHTML = out;
-    const first = holder.firstElementChild;
-    if (!first) {
-      element.replaceWith(document.createTextNode(tex));
-    } else if (display && first.classList.contains('katex-display')) {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'katex-display';
-      wrapper.append(...first.childNodes);
-      element.replaceWith(wrapper);
-    } else {
-      element.replaceWith(first);
-    }
-  }
-  return container.innerHTML;
+    // out 由 KaTeX 自己生成，内容自洽、不含占位符，直接插入即可。
+    // display 模式下 KaTeX 已产出 .katex-display 容器，无需额外包裹。
+    return out;
+  });
 }

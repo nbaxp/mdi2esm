@@ -57,7 +57,7 @@ export async function createScriptModule(scripts, dir, config = createConfig()) 
   if (moduleSource === null) return null;
   const url = URL.createObjectURL(new Blob([moduleSource], { type: 'text/javascript' }));
   try {
-    const module = await import(url);
+    const module = await import(/* @vite-ignore */ url);
     return module.default ?? null;
   } catch (err) {
     console.warn('[markdown-it] <script> 执行失败，忽略该脚本：', err);
@@ -92,7 +92,7 @@ export async function createSetup(scripts, dir, frontmatter, params, config = cr
   if (moduleSource === null) return null;
   const url = URL.createObjectURL(new Blob([moduleSource], { type: 'text/javascript' }));
   try {
-    const module = await import(url);
+    const module = await import(/* @vite-ignore */ url);
     return module.setup;
   } catch (err) {
     console.warn('[markdown-it] <script setup> 执行失败，已降级为无脚本渲染：', err);
