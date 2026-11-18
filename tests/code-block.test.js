@@ -3,7 +3,8 @@ import { test } from 'node:test';
 
 import MarkdownIt from 'markdown-it';
 
-import { applyCodeBlock, applyLineNumbers, maskFenceMarkers, unmaskFenceMarkers } from '../src/index.js';
+import { applyCodeBlock, maskFenceMarkers, unmaskFenceMarkers } from '../src/code-block.js';
+import { applyLineNumbers } from '../src/markdown-plugins.js';
 
 function freshMd() {
   const m = new MarkdownIt();

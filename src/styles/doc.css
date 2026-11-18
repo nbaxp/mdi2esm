@@ -1217,6 +1217,14 @@
 
 /* ---- Mermaid / 数学占位 ---- */
 .vp-doc .mermaid-rendered {
+  --pele-bg: var(--vp-c-bg);
+  --pele-fg: var(--vp-c-text-1);
+  --pele-muted: var(--vp-c-text-2);
+  --pele-line: var(--vp-c-text-2);
+  --pele-surface: var(--vp-c-bg-soft);
+  --pele-surface-alt: var(--vp-c-bg-alt);
+  --pele-border: var(--vp-c-divider);
+
   margin: 1rem 0;
   overflow-x: auto;
 }

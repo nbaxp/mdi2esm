@@ -8,7 +8,7 @@
 // 同一份源码的产物（库本体另出 index.js/index.min.js 供 npm 包），所有依赖打进 dist，
 // 无 importmap、无 node_modules 依赖。
 // 完整打包版内联 markdown 核心栈（markdown-it / @mdit* / @mdit-vue）与 Prism；其余框架与重依赖
-// （vue / vue-style-runtime / katex / mermaid）外部化为 peer，
+// （vue / vue-style-runtime / katex / mermaid / pele）外部化为 peer，
 // 由消费方提供，避免重复实例与体积膨胀。
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,7 +26,16 @@ const dist = path.join(root, 'dist');
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(dist, { recursive: true });
 
-const peerBare = ['@iconify/vue', 'vue', 'vue-style-runtime', 'katex', 'mermaid', 'medium-zoom', 'markdown-it-emoji'];
+const peerBare = [
+  '@iconify/vue',
+  'vue',
+  'vue-style-runtime',
+  'katex',
+  'mermaid',
+  'pele',
+  'medium-zoom',
+  'markdown-it-emoji',
+];
 const isExternal = (id) => peerBare.includes(id);
 // 核心栈依赖（被内联）装在本包 node_modules，Vite 默认即可解析，无需 alias
 
@@ -41,16 +50,14 @@ async function main() {
       logLevel: 'warn',
       // demo 的静态资源在后面步骤处理，这里不让 Vite 去复制 public/
       publicDir: false,
-      // src/markdown-content.vue 走 SFC 编译：组件自身不再依赖运行时模板编译，
-      // 剩下的 compile() 只用于 md 转出来的模板（消费方仍需完整版 Vue）
-      plugins: [createBaseConfig().plugins],
+      plugins: [],
       build: {
         outDir: dist,
         emptyOutDir: false,
         target: 'es2020',
         minify,
         lib: {
-          entry: path.join(root, 'src', 'index.full.js'),
+          entry: path.join(root, 'src', 'index.js'),
           formats: ['es'],
           fileName: () => name,
         },

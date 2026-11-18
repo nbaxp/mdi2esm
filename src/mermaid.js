@@ -1,12 +1,24 @@
 // ```mermaid 代码块 → <MermaidBlock> 组件（fence 规则见 ./code-block.js）。
-// 走组件而不是「挂载后扫 document」：作用域就是组件自己的根节点，多实例互不干扰。
+// 默认由 Pele 渲染 Mermaid 语法，也可按配置切回 Mermaid；两种驱动共用同一组件边界。
 // SVG 只能经 innerHTML 写进真实 DOM——Vue 模板编译会丢掉 SVG 内嵌的 <style>。
 import { h, onMounted, onUnmounted, shallowRef, watch } from 'vue';
 
 let mermaidPromise;
+let pelePromise;
 let mermaidCount = 0;
 
-const loadMermaid = () => (mermaidPromise ??= import('mermaid').catch(() => null));
+const loadMermaid = () =>
+  (mermaidPromise ??= import('mermaid').catch((err) => {
+    console.warn('[mdi2esm] Mermaid 模块加载失败：', err);
+    return null;
+  }));
+
+const loadPele = () =>
+  (pelePromise ??= import('pele').catch((err) => {
+    console.warn('[mdi2esm] Pele 模块加载失败：', err);
+    return null;
+  }));
+
 const isDark = () => document.documentElement.classList.contains('dark');
 
 const cssVar = (name, fallback) => {
@@ -14,7 +26,7 @@ const cssVar = (name, fallback) => {
   return value || fallback;
 };
 
-// 配色从页面 CSS 变量取，宿主换主题不用改库
+// Mermaid 配色从页面 CSS 变量取；Pele 直接继承 --pele-* 变量，主题切换无需重绘
 function mermaidConfig() {
   const bg = cssVar('--vp-c-bg', '#ffffff');
   const bgSoft = cssVar('--vp-c-bg-soft', bg);
@@ -52,62 +64,75 @@ function mermaidConfig() {
   };
 }
 
-export const MermaidBlock = {
-  name: 'MermaidBlock',
-  props: {
-    // fence 里 encodeURIComponent 过，避免引号、换行把模板属性搞坏
-    graph: { type: String, required: true },
-  },
-  setup(props) {
-    const source = () => decodeURIComponent(props.graph);
-    const svg = shallowRef('');
-    const id = `md-mermaid-${(mermaidCount += 1)}`;
-    let theme = '';
-    let observer;
-    let seq = 0;
+export function createMermaidBlock(driver = 'pele') {
+  return {
+    name: 'MermaidBlock',
+    props: {
+      // fence 里 encodeURIComponent 过，避免引号、换行把模板属性搞坏
+      graph: { type: String, required: true },
+    },
+    setup(props) {
+      const source = () => decodeURIComponent(props.graph);
+      const svg = shallowRef('');
+      const id = `md-mermaid-${(mermaidCount += 1)}`;
+      let theme = '';
+      let observer;
+      let seq = 0;
 
-    async function paint() {
-      const current = ++seq;
-      const module = await loadMermaid();
-      if (current !== seq) return;
-      if (!module) {
-        console.warn('[mdi2esm] Mermaid 加载失败，保留源码');
-        return;
-      }
-      const mermaid = module.default ?? module;
-      theme = isDark() ? 'dark' : 'default';
-      // 字体没就绪时量出来的文本宽度偏，等它
-      await document.fonts?.ready;
-      if (current !== seq) return;
-      mermaid.initialize(mermaidConfig());
-      try {
-        await mermaid.parse(source());
-        const { svg: next } = await mermaid.render(id, source());
-        if (current === seq) svg.value = next;
-      } catch (err) {
-        console.warn('[mdi2esm] Mermaid 渲染失败，保留源码：', err);
-      }
-    }
+      async function paint() {
+        const current = ++seq;
+        // 两种驱动都需要等字体就绪，否则文本测量会偏
+        await document.fonts?.ready;
+        if (current !== seq) return;
 
-    onMounted(() => {
-      // 主题切换（html.dark）重绘，只认 class 的实际变化
-      observer = new MutationObserver(() => {
-        if ((isDark() ? 'dark' : 'default') === theme) return;
+        if (driver !== 'mermaid') {
+          const module = await loadPele();
+          if (current !== seq || !module) return;
+          try {
+            const { svg: next } = module.render(source());
+            if (current === seq) svg.value = next;
+          } catch (err) {
+            console.warn('[mdi2esm] Pele 渲染失败，保留源码：', err);
+          }
+          return;
+        }
+
+        const module = await loadMermaid();
+        if (current !== seq || !module) return;
+        const mermaid = module.default ?? module;
+        theme = isDark() ? 'dark' : 'default';
+        mermaid.initialize(mermaidConfig());
+        try {
+          await mermaid.parse(source());
+          const { svg: next } = await mermaid.render(id, source());
+          if (current === seq) svg.value = next;
+        } catch (err) {
+          console.warn('[mdi2esm] Mermaid 渲染失败，保留源码：', err);
+        }
+      }
+
+      onMounted(() => {
+        if (driver === 'mermaid') {
+          // Mermaid 主题切换（html.dark）需要重绘；Pele 由 CSS 变量直接换色
+          observer = new MutationObserver(() => {
+            if ((isDark() ? 'dark' : 'default') === theme) return;
+            paint();
+          });
+          observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        }
         paint();
       });
-      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-      paint();
-    });
 
-    onUnmounted(() => observer?.disconnect());
+      onUnmounted(() => observer?.disconnect());
 
-    // 同一位置被复用时 graph 会变，要重画
-    watch(() => props.graph, paint);
+      // 同一位置被复用时 graph 会变，要重画
+      watch(() => props.graph, paint);
 
-    // 渲染出来之前（以及失败时）显示源码，不留空白
-    return () =>
-      svg.value
-        ? h('div', { class: 'mermaid-rendered', innerHTML: svg.value })
-        : h('pre', { class: 'mermaid-source' }, source());
-  },
-};
+      // 渲染出来之前（以及失败时）显示源码，不留空白
+      return () =>
+        svg.value
+          ? h('div', { class: 'mermaid-rendered', innerHTML: svg.value })
+          : h('pre', { class: 'mermaid-source' }, source());
+    },
+  };
+}

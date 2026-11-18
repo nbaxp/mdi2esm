@@ -1,8 +1,10 @@
 // Markdown 渲染管线：共享 markdown-it 实例 + 通用链接重写。
 // URL 拼装与锚点形态由 config.adapters 提供，标题锚点由 markdown-it.js 里的官方 anchor 插件生成
+import { maskFenceMarkers, unmaskFenceMarkers } from './code-block.js';
 import { createRenderEnv, DEFAULT_ADAPTERS } from './config.js';
 import md, { ensureCustomContainers, ensureSyntaxPlugins } from './markdown-it.js';
 import { normalizeHash } from './markdown-plugins.js';
+import { renderMath } from './math.js';
 
 // 路径解析：'guide/./a.md' → 'guide/a.md'，处理 './' 与 '../'
 export const resolvePath = (base, rel) => {
@@ -71,7 +73,7 @@ md.core.ruler.push('link_rewrite', (state) => {
         }
         if (href.startsWith('#')) {
           const normalized = normalizeHash(href.slice(1));
-          if (normalized) child.attrSet('href', adapters.anchorHref(normalized.slice(1)));
+          if (normalized) child.attrSet('href', normalized);
           continue;
         }
         if (href.startsWith('/')) continue;
@@ -116,14 +118,15 @@ export function buildOutline(headings) {
   return root;
 }
 
-// markdown → { html, headings }：headings 由官方 anchor 插件的 permalink 回调按出现顺序填充，
-// 供 createMarkdownComponent 与本页目录、以及 mdoc / esm 的渲染测试使用（与旧 mdoc 契约一致）
-export function renderMarkdown(body, { dir = '', config } = {}) {
+// markdown → { html, headings }：headings 由官方 anchor 插件的 permalink 回调按出现顺序填充。
+// 围栏保护与 KaTeX 渲染都在内部完成，调用方拿到的就是可挂载的最终 HTML，
+// 不需要也不应该自己再拼 mask / renderMath 这两步。
+export async function renderMarkdown(body, { dir = '', config } = {}) {
   const env = createRenderEnv(config, { dir });
   ensureCustomContainers(env.config);
   ensureSyntaxPlugins(env.config);
-  const html = md.render(body.replace(IMAGE_SIZE_PRE, '$1=$2)'), env);
-  return { html, headings: env.headings };
+  const html = md.render(maskFenceMarkers(body).replace(IMAGE_SIZE_PRE, '$1=$2)'), env);
+  return { html: await renderMath(unmaskFenceMarkers(html)), headings: env.headings };
 }
 
 // Vue 模板里合法的表达式保留插值；语法非法的 {{ ... }} 转义成字面量，

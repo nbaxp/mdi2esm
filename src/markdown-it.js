@@ -1,5 +1,5 @@
-// Markdown → 渲染实例装配（移植自 mdoc，原 npm2esm entries/markdown-it 迁入应用侧）
-// 依赖包由 npm2esm 各自构建、经 importmap 解析，在此完成实例装配
+// Markdown → 渲染实例装配（移植自 mdoc）
+// 依赖由 Vite 打包进库产物，在此完成 markdown-it 与插件装配
 import { anchor } from '@mdit/plugin-anchor';
 import { attrs } from '@mdit/plugin-attrs';
 import { container } from '@mdit/plugin-container';
@@ -14,7 +14,7 @@ import MarkdownIt from 'markdown-it';
 import cjkFriendly from 'markdown-it-cjk-friendly';
 
 import { applyCodeBlock } from './code-block.js';
-import { CONTAINER_LABELS, DEFAULT_ADAPTERS } from './config.js';
+import { CONTAINER_LABELS } from './config.js';
 import { applyRestoreEntities, applyTablePlugin, extractLang } from './markdown-plugins.js';
 
 const md = new MarkdownIt({ html: true, linkify: true });
@@ -95,7 +95,7 @@ md.use(anchor, {
       Object.assign(new state.Token('link_open', 'a', 1), {
         attrs: [
           ['class', 'header-anchor'],
-          ['href', (state.env.adapters ?? DEFAULT_ADAPTERS).anchorHref(slug)],
+          ['href', `#${slug}`],
           ['aria-label', `Permalink to “${title}”`],
         ],
       }),

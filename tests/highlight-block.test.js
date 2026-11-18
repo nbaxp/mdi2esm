@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { highlightBlock, Prism } from '../src/index.js';
+// 与库内高亮走同一个 prismjs 模块实例：注册的语言对 highlightBlock 立即生效
+import Prism from 'prismjs';
+
+import { highlightBlock } from '../src/index.js';
 
 test('highlightBlock 输出 pre > code 并带 language- 类名', () => {
   const { html, lang, ok } = highlightBlock('const a = 1;', 'ts');
@@ -36,7 +39,7 @@ test('语言名注入被清洗，不会破坏 class 属性', () => {
   assert.match(html, /^<pre class="language-/);
 });
 
-test('导出 Prism 实例，可注册额外语法', () => {
+test('语言注册进共享 Prism 实例后 highlightBlock 可用', () => {
   Prism.languages.demo = { keyword: /\bdemo\b/ };
   const { html, ok } = highlightBlock('demo 1', 'demo');
   assert.equal(ok, true);

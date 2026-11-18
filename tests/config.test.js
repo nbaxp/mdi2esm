@@ -2,8 +2,6 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
-  buildScriptModuleSource,
-  buildSetupModuleSource,
   CONTAINER_LABELS,
   COPY_LABELS,
   createBaseAdapters,
@@ -11,13 +9,16 @@ import {
   createRenderEnv,
   DEFAULT_ADAPTERS,
   DEFAULT_CONFIG,
-} from '../src/index.js';
+} from '../src/config.js';
+import { buildScriptModuleSource, buildSetupModuleSource } from '../src/markdown-script.js';
 
-const ADAPTER_KEYS = ['toHref', 'toSrc', 'anchorHref', 'toScriptImport', 'scriptContext'];
+const ADAPTER_KEYS = ['toHref', 'toSrc', 'toScriptImport', 'scriptContext'];
 
 test('配置：schema 与默认预设', () => {
   assert.deepEqual(Object.keys(DEFAULT_ADAPTERS).sort(), [...ADAPTER_KEYS].sort());
   assert.equal(DEFAULT_CONFIG.locale, 'zh');
+  assert.equal(DEFAULT_CONFIG.mermaidDriver, 'pele');
+  assert.equal(createConfig({ mermaidDriver: 'mermaid' }).mermaidDriver, 'mermaid');
   assert.deepEqual(DEFAULT_CONFIG.markdown, {
     lineNumbers: false,
     math: true,
@@ -42,8 +43,8 @@ test('配置：createConfig 合并覆盖并按 locale 选文案', () => {
     container: [],
     frontmatterParser: null,
   });
-  const custom = createConfig({ adapters: { anchorHref: () => '#x' } });
-  assert.equal(custom.adapters.anchorHref('a'), '#x');
+  const custom = createConfig({ adapters: { toSrc: ({ src }) => `/x/${src}` } });
+  assert.equal(custom.adapters.toSrc({ src: 'a.png', resolved: 'guide/a.png' }), '/x/a.png');
   // 只覆写声明的那个，其余仍走 base 生成的默认实现
   assert.equal(custom.adapters.toHref({ path: 'a.md', resolved: 'a.md', hash: '' }), '/a');
 });
@@ -56,13 +57,12 @@ test('渲染 env：暴露 adapters / labels / headings', () => {
   assert.deepEqual(env.headings, []);
 });
 
-test('适配器：toHref / toSrc / anchorHref', () => {
-  const { toHref, toSrc, anchorHref } = DEFAULT_ADAPTERS;
+test('适配器：toHref / toSrc', () => {
+  const { toHref, toSrc } = DEFAULT_ADAPTERS;
   assert.equal(toHref({ path: './foo.md', resolved: 'guide/foo.md', hash: '' }), '/guide/foo');
   assert.equal(toHref({ path: 'a.png', resolved: 'guide/a.png', hash: '#章节' }), '/guide/a.png#章节');
   assert.equal(toSrc({ src: 'a.png', resolved: 'guide/a.png' }), '/guide/a.png');
   assert.equal(toSrc({ src: '/img/a.png', resolved: '/img/a.png' }), '/img/a.png');
-  assert.equal(anchorHref('章节-标题'), '#章节-标题');
 });
 
 test('脚本：相对导入按 config 适配器重写', () => {

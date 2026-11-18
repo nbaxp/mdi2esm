@@ -3,13 +3,11 @@
 import { compile, defineComponent, markRaw } from 'vue';
 import { styleMixin } from 'vue-style-runtime';
 
-import { maskFenceMarkers, unmaskFenceMarkers } from './code-block.js';
 import { parseFrontmatter } from './frontmatter.js';
 import { mountImageZoom } from './image-zoom.js';
 import { ensureEmojiPlugin } from './markdown-it.js';
 import { createScriptModule, createSetup } from './markdown-script.js';
-import { renderMath } from './math.js';
-import { MermaidBlock } from './mermaid.js';
+import { createMermaidBlock } from './mermaid.js';
 import { escapeInvalidInterpolations, renderMarkdown } from './render.js';
 
 // 剥离第一个顶级的 <script>（页面级脚本，围栏内的不动），style 块全部剥离经 styleMixin 注入组件。
@@ -97,21 +95,20 @@ export async function createMarkdownComponent(source, dir, config, { frontmatter
   const { body, scripts, styles } = extractTopLevelBlocks(parsed.body);
   // markdown-it-emoji 不内置：装了就挂上（幂等），没装静默跳过，渲染结果不受影响
   await ensureEmojiPlugin();
-  const { html, headings } = renderMarkdown(maskFenceMarkers(body), { dir, config });
-  const withMath = await renderMath(unmaskFenceMarkers(html));
+  const { html, headings } = await renderMarkdown(body, { dir, config });
   if (!body.trim()) return { component: null, headings: [] };
 
   const options = {
-    // 不给 name：这是每份 md 一次性编出来的渲染组件，和 <MarkdownContent> 同名只会在 devtools 里混淆
+    // 不给 name：这是每份 md 一次性编出来的渲染组件，同名只会在 devtools 里混淆
     // 把 frontmatter 挂到实例，使模板里的 {{ $frontmatter.xxx }} 可用
     beforeCreate() {
       this.$frontmatter = data ?? {};
     },
-    render: compile(escapeInvalidInterpolations(withMath)),
+    render: compile(escapeInvalidInterpolations(html)),
     // ```mermaid 渲染成 <MermaidBlock>，图形由组件自己画，管线不碰 DOM
     components: {
       ClientOnly: { template: '<slot />' },
-      MermaidBlock,
+      MermaidBlock: createMermaidBlock(config?.mermaidDriver),
     },
     // 图片缩放：medium-zoom 动态加载，仅当正文有可放大图片时挂载
     async mounted() {

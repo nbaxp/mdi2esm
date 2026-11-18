@@ -10,7 +10,7 @@
         重写到源码与 node_modules——引用全是非 dist 内容。
       - build（npm run build）：Vite 把本文件当入口打进 dist/，所有导入解析成打包产物，
         dist 自包含，`npm run preview` 或直接发布 GitHub Pages 都能跑，无需 importmap。
-      - 渲染走 <MarkdownContent>（完整管线：frontmatter、Prism 高亮、KaTeX、script setup）。
+      - 渲染走 createMarkdownComponent（完整管线：frontmatter、Prism 高亮、KaTeX、script setup）。
       - 左列 textarea 编辑，右列实时预览（输入防抖 400ms），「渲染」按钮强制刷新，最右是大纲。
     -->
     <link rel="stylesheet" href="./src/styles/index.css" />
@@ -45,13 +45,22 @@
         font-size: 13px;
       }
 
-      .demo-header button {
+      .demo-header button,
+      .demo-driver select {
         border: 1px solid var(--vp-c-divider);
         background: var(--vp-c-bg-soft);
         color: var(--vp-c-text-1);
         border-radius: 6px;
         padding: 4px 12px;
         cursor: pointer;
+        font-size: 13px;
+      }
+
+      .demo-driver {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--vp-c-text-2);
         font-size: 13px;
       }
 
@@ -132,26 +141,18 @@
         z-index: 101;
       }
     </style>
-    <script type="importmap">
-      {
-        "imports": {
-          "vue": "./node_modules/vue/dist/vue.esm-browser.prod.js",
-          "vue-style-runtime": "./node_modules/vue-style-runtime/index.js",
-          "mdi2esm": "./index.min.js",
-          "@iconify/vue": "./node_modules/@iconify/vue/dist/iconify.mjs",
-          "katex": "./node_modules/katex/dist/katex.mjs",
-          "mermaid": "./node_modules/mermaid/dist/mermaid.esm.min.mjs",
-          "medium-zoom": "./node_modules/medium-zoom/dist/medium-zoom.esm.js",
-          "markdown-it-emoji": "./node_modules/markdown-it-emoji/index.mjs",
-          "markdown-it-emoji/lib/data/full.mjs": "./node_modules/markdown-it-emoji/lib/data/full.mjs"
-        }
-      }
-    </script>
   </head>
   <body>
     <header class="demo-header">
       <strong>mdi2esm</strong>
       <span>全面 demo · Vite dev/preview · 左编辑右预览</span>
+      <label class="demo-driver">
+        图表驱动
+        <select id="diagram-driver">
+          <option value="pele" selected>Pele（默认）</option>
+          <option value="mermaid">Mermaid</option>
+        </select>
+      </label>
       <button id="render">渲染</button>
       <button id="toggle-theme">深色</button>
     </header>
@@ -173,7 +174,7 @@
       // ===== demo 全部逻辑（原 demo/vp-badge.js + demo/main.js，内联成单文件页面） =====
 
       // 宿主侧的徽标组件（复制自 mdoc 的 theme/components/VPBadge.js）。
-      // mdi2esm 不内置 Badge：宿主提供组件，经 <MarkdownContent> 的 components 属性注入。
+      // mdi2esm 不内置 Badge：宿主提供组件，编译后经渲染组件的 components 注入。
       // 1:1 移植 VitePress VPBadge.vue（原版：
       // https://github.com/vuejs/vitepress/blob/v2.0.0-alpha.21/src/client/theme-default/components/VPBadge.vue）
       import styleMixin from 'vue-style-runtime';
@@ -286,8 +287,8 @@
 
       // ===== 页面主体 =====
       import { Icon } from '@iconify/vue';
-      import { buildOutline, createConfig, MarkdownContent } from 'mdi2esm';
-      import { createApp, h, nextTick, shallowRef } from 'vue';
+      import { buildOutline, createConfig, createMarkdownComponent } from 'mdi2esm';
+      import { createApp, h, nextTick, shallowRef, watch } from 'vue';
 
       // 注入的唯一入口：md 里用到的 <Icon> / <Badge> 全在这里登记，库内一个都不含。
       // Icon 来自 Iconify；VPBadge 是宿主自己写的组件（内联在本文件上方）。
@@ -311,8 +312,11 @@
         },
       });
 
-      // 页面唯一的 Vue 状态：md 文本。改它就会重新编译，其余都由 <MarkdownContent> 内部处理
+      // 页面唯一的 Vue 状态：md 文本与图表驱动。改它就会重新编译
       const source = shallowRef(readme);
+      const driver = shallowRef('pele');
+      // 当前编译出来的渲染组件
+      const view = shallowRef(null);
 
       let marker = null;
       let spyLinks = [];
@@ -388,28 +392,45 @@
       content.addEventListener('scroll', scheduleActive, { passive: true });
       window.addEventListener('resize', scheduleActive);
 
-      // <MarkdownContent> 编译完抛出的 headings：右侧大纲就地重建
+      // 编译完得到的 headings：右侧大纲就地重建
       async function onHeadings(headings) {
         outline.innerHTML = '';
         createTitle(outline);
         createMarker(outline);
         renderOutline(buildOutline(headings), outline);
-        // 标题元素要等 MarkdownContent 把内容 patch 进 DOM 才取得到
+        // 标题元素要等新组件 patch 进 DOM 才取得到
         await nextTick();
         collectOutlineTargets();
         scheduleActive();
       }
 
-      // 整个页面只有一个 Vue 应用：一个标签 + 三个属性，不再手工调 createMarkdownComponent
+      // 文本变了就重编译：按序号丢弃过期结果，编译完再替换视图
+      let compileSeq = 0;
+      async function rebuild() {
+        const seq = ++compileSeq;
+        try {
+          const { component, headings } = await createMarkdownComponent(source.value, '', {
+            ...config,
+            mermaidDriver: driver.value,
+          });
+          if (seq !== compileSeq) return;
+          if (!component) {
+            view.value = null;
+            await onHeadings(headings);
+            return;
+          }
+          component.components = { ...(component.components || {}), ...HOST_COMPONENTS };
+          view.value = component;
+          await onHeadings(headings);
+        } catch (err) {
+          if (seq === compileSeq) fail(err);
+        }
+      }
+
+      // 整个页面只有一个 Vue 应用，视图就是每次编译出来的组件
       const Root = {
         setup() {
-          return () =>
-            h(MarkdownContent, {
-              source: source.value,
-              config,
-              components: HOST_COMPONENTS,
-              onHeadings,
-            });
+          return () => (view.value ? h(view.value) : null);
         },
       };
 
@@ -418,9 +439,11 @@
         console.error(err);
       }
 
-      // 挂载后由 <MarkdownContent> 接管：文本变了就重编译，大纲由 onHeadings 重建
+      // 挂载后由 rebuild 接管：文本变了就重编译，大纲由 onHeadings 重建
       try {
         createApp(Root).mount(content);
+        watch([source, driver], rebuild);
+        await rebuild();
       } catch (err) {
         fail(err);
       }
@@ -438,6 +461,9 @@
       document.getElementById('render').addEventListener('click', () => {
         clearTimeout(inputTimer);
         source.value = ta.value;
+      });
+      document.getElementById('diagram-driver').addEventListener('change', (event) => {
+        driver.value = event.target.value;
       });
       document.getElementById('toggle-theme').addEventListener('click', () => {
         document.documentElement.classList.toggle('dark');

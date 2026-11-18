@@ -1,36 +1,37 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { renderMarkdown, renderSource as render } from '../src/index.js';
+import { renderMarkdown } from '../src/index.js';
+import { render } from '../src/markdown-it.js';
 
-test('tip 容器渲染为 custom-block 且带默认标题（zh）', () => {
-  const { html } = renderMarkdown('::: tip\n内容\n:::');
+test('tip 容器渲染为 custom-block 且带默认标题（zh）', async () => {
+  const { html } = await renderMarkdown('::: tip\n内容\n:::');
   assert.match(html, /<div class="tip custom-block">/);
   assert.match(html, /<p class="custom-block-title[^"]*">提示<\/p>/);
   assert.ok(html.includes('内容'));
 });
 
-test('warning 容器支持自定义标题', () => {
-  const { html } = renderMarkdown('::: warning 注意安全\n内容\n:::');
+test('warning 容器支持自定义标题', async () => {
+  const { html } = await renderMarkdown('::: warning 注意安全\n内容\n:::');
   assert.match(html, /<div class="warning custom-block">/);
   assert.match(html, /<p class="custom-block-title">注意安全<\/p>/);
 });
 
-test('details 容器渲染为 details/summary', () => {
-  const { html } = renderMarkdown('::: details\n内容\n:::');
+test('details 容器渲染为 details/summary', async () => {
+  const { html } = await renderMarkdown('::: details\n内容\n:::');
   assert.match(html, /<details class="details custom-block">/);
   assert.match(html, /<summary>详细信息<\/summary>/);
 });
 
-test('GitHub alert > [!NOTE] 转为 custom-block', () => {
-  const { html } = renderMarkdown('> [!NOTE]\n> 内容\n');
+test('GitHub alert > [!NOTE] 转为 custom-block', async () => {
+  const { html } = await renderMarkdown('> [!NOTE]\n> 内容\n');
   assert.match(html, /<div class="note custom-block github-alert">/);
   assert.match(html, /<p class="custom-block-title">注意<\/p>/);
   assert.ok(html.includes('内容'));
 });
 
-test('未知容器类型不渲染为 custom-block', () => {
-  const { html } = renderMarkdown('::: my-unknown-type\n内容\n:::');
+test('未知容器类型不渲染为 custom-block', async () => {
+  const { html } = await renderMarkdown('::: my-unknown-type\n内容\n:::');
   assert.ok(!/custom-block/.test(html));
 });
 

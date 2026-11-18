@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildSetupModuleSource } from '../src/index.js';
+import { buildSetupModuleSource } from '../src/markdown-script.js';
 
 test('buildSetupModuleSource 注入 frontmatter/params 到 setup 作用域', () => {
   const src = buildSetupModuleSource(

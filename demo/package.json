@@ -1,0 +1,44 @@
+{
+  "name": "mdi2esm-demo",
+  "private": true,
+  "version": "0.0.0",
+  "description": "mdi2esm 的原生 ESM 示例：依赖由 npm2esm 预构建、importmap 映射，不经过打包器",
+  "type": "module",
+  "scripts": {
+    "build": "npm2esm .",
+    "preview": "node preview.mjs"
+  },
+  "dependencies": {
+    "@braintree/sanitize-url": "7.1.2",
+    "@iconify/utils": "3.1.7",
+    "@iconify/vue": "^5.0.3",
+    "@upsetjs/venn.js": "2.0.0",
+    "chevrotain": "13.2.0",
+    "cytoscape": "3.35.0",
+    "cytoscape-cose-bilkent": "4.1.0",
+    "cytoscape-fcose": "2.2.0",
+    "d3": "7.9.2",
+    "d3-sankey": "0.12.3",
+    "dagre-d3-es": "7.0.14",
+    "dayjs": "1.11.23",
+    "dompurify": "3.4.18",
+    "elkjs": "0.12.1",
+    "es-toolkit": "1.53.2",
+    "katex": "0.19.1",
+    "khroma": "2.1.0",
+    "markdown-it-emoji": "^3.1.0",
+    "marked": "16.4.2",
+    "mdi2esm": "file:..",
+    "medium-zoom": "1.1.2",
+    "mermaid": "12.3.0",
+    "pele": "1.13.0",
+    "roughjs": "4.6.6",
+    "stylis": "4.4.0",
+    "ts-dedent": "2.3.0",
+    "vue": "^3.5.44",
+    "vue-style-runtime": "^1.0.1"
+  },
+  "devDependencies": {
+    "npm2esm": "^0.1.5"
+  }
+}

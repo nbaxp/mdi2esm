@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildOutline, escapeInvalidInterpolations, renderMarkdown, resolvePath } from '../src/index.js';
+import { buildOutline, renderMarkdown } from '../src/index.js';
+import { escapeInvalidInterpolations, resolvePath } from '../src/render.js';
 
 test('resolvePath：处理 ./ 与 ../', () => {
   assert.equal(resolvePath('guide/', './a.md'), 'guide/a.md');
@@ -9,8 +10,8 @@ test('resolvePath：处理 ./ 与 ../', () => {
   assert.equal(resolvePath('', 'a/b/../c.md'), 'a/c.md');
 });
 
-test('buildOutline：按 level 生成层级树', () => {
-  const { headings } = renderMarkdown('## A\n### B\n## C');
+test('buildOutline：按 level 生成层级树', async () => {
+  const { headings } = await renderMarkdown('## A\n### B\n## C');
   const tree = buildOutline(headings);
   assert.equal(tree.length, 2);
   assert.equal(tree[0].title, 'A');
@@ -18,8 +19,8 @@ test('buildOutline：按 level 生成层级树', () => {
   assert.equal(tree[1].title, 'C');
 });
 
-test('renderMarkdown 收集 h2-h6 标题（h1 页面标题不进目录）', () => {
-  const { headings: collected } = renderMarkdown('# H1\n## H2\n### H3\n#### H4\n##### H5');
+test('renderMarkdown 收集 h2-h6 标题（h1 页面标题不进目录）', async () => {
+  const { headings: collected } = await renderMarkdown('# H1\n## H2\n### H3\n#### H4\n##### H5');
   assert.deepEqual(
     collected.map((h) => h.level),
     [2, 3, 4, 5],

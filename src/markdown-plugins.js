@@ -99,10 +99,3 @@ export function applyLineNumbers(md, enable) {
     return rawCode.replace(/<\/div>\s*$/, `${wrapper}</div>`).replace(/"(language-[^"]*?)"/, '"$1 line-numbers-mode"');
   };
 }
-
-// 锚点 href 生成完整同页路径（根绝对），规避 <base> 把纯 #锚点 解析到部署根。
-// Node 测试环境无 location，回退纯锚点保持既有断言。
-export function anchorHref(id) {
-  if (typeof location === 'undefined') return `#${id}`;
-  return `${location.pathname}${location.search}#${id}`;
-}

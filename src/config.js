@@ -34,6 +34,8 @@ export const COPY_LABELS = {
 // 属于宿主壳，包内不读，也就不该出现在默认配置里
 export const DEFAULT_CONFIG = {
   locale: 'zh',
+  // Mermaid 语法代码块的渲染驱动：默认 Pele，可切回 Mermaid
+  mermaidDriver: 'pele',
   // mark / sub / sup：`==高亮==`、`H~2~O`、`x^2^`，置 false 关闭
   markdown: {
     lineNumbers: false,
@@ -62,7 +64,6 @@ export function createBaseAdapters(base = '/') {
       if (src.startsWith('/')) return `${prefix}${src}`;
       return `${prefix}/${resolved}`;
     },
-    anchorHref: (slug) => `#${slug}`,
     toScriptImport: ({ spec, resolved }) => {
       if (spec.startsWith('.')) return `${prefix}/${resolved}`;
       if (spec.startsWith('/')) return `${prefix}${spec}`;

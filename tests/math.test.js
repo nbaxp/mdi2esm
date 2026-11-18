@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import md, { renderMath } from '../src/index.js';
+import { md } from '../src/index.js';
+import { renderMath } from '../src/math.js';
 
 test('行内公式：输出行内占位标记', () => {
   const html = md.render('公式 $x^2$ 结束');

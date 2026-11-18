@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>mdi2esm demo · ES module</title>
+    <!--
+      这个 demo 和根目录的 index.html 是两套东西：
+      - 根目录 index.html 走 Vite（dev / build 都经过打包器）。
+      - 本页是浏览器原生 ESM：没有打包步骤，依赖全部由 npm2esm 预构建到 ./lib，
+        经 ./importmap.js 映射后直接 import。
+      构建：npm run demo:esm:build（产出 demo/lib 与 demo/importmap.js）
+      预览：npm run demo:esm
+    -->
+    <link rel="stylesheet" href="./lib/mdi2esm/index.min.css" />
+    <link rel="stylesheet" href="./lib/katex/katex.min.css" />
+    <link rel="stylesheet" href="./demo.css" />
+  </head>
+  <body>
+    <header class="demo-header">
+      <strong>mdi2esm</strong>
+      <span>全面 demo · 原生 ESM + importmap · 左编辑右预览</span>
+      <label class="demo-driver">
+        图表驱动
+        <select id="diagram-driver">
+          <option value="pele" selected>Pele（默认）</option>
+          <option value="mermaid">Mermaid</option>
+        </select>
+      </label>
+      <button id="render">渲染</button>
+      <button id="toggle-theme">深色</button>
+    </header>
+    <main class="demo-main">
+      <section>
+        <p class="demo-col-title">Markdown 源（README.md，可编辑）</p>
+        <textarea id="src" class="demo-src" spellcheck="false"></textarea>
+      </section>
+      <section>
+        <p class="demo-col-title">渲染结果</p>
+        <div id="content" class="demo-rendered vp-doc"></div>
+      </section>
+      <aside>
+        <nav id="outline" class="vp-doc-outline"></nav>
+      </aside>
+    </main>
+
+    <script src="./importmap.js"></script>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

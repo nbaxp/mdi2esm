@@ -14,8 +14,23 @@ A markdown-it wrapper with common plugins integrated. It renders Markdown into V
 > 这份 README 就是 demo 的渲染源：左侧可实时编辑，右侧渲染。它同时是包文档和能力全景——基础语法、容器、GitHub alerts、脚注、任务列表、图标与 emoji 短码、CJK 混排、属性、目录、代码高亮、数学、图表、图片缩放，以及宿主注入的组件（`<Badge>` / `<Icon>`）和 `<script setup>`。
 
 ::: tip 关于这份文档
-顶部有 frontmatter（`title` / `description`）和一个 `<script setup>`，都由库的渲染管线处理（`<MarkdownContent>` 内部走的就是它）。下面的 `{{ greeting }}` 就是 setup 里定义的变量：**{{ greeting }}**。
+顶部有 frontmatter（`title` / `description`）和一个 `<script setup>`，都由库的渲染管线处理（`createMarkdownComponent` 内部走的就是它）。下面的 `{{ greeting }}` 就是 setup 里定义的变量：**{{ greeting }}**。
 :::
+
+## Mermaid 图表
+
+```mermaid
+graph TD
+  A[开始] --> B{判断}
+  B -->|是| C[结束]
+  B -->|否| A
+```
+
+默认由 **Pele** 渲染，可通过 `createConfig({ mermaidDriver: 'mermaid' })` 切回 Mermaid；可选值只有 `pele` 和 `mermaid`，没有自动回退模式。原生 ESM demo 顶部可以直接切换并对比同一图源。
+
+点击右上角"深色"按钮切换主题：Pele 通过 CSS 变量换色，Mermaid 会随 `html.dark` 自动重绘。
+
+围栏会被渲染成 `<MermaidBlock graph="…">`（源码经 `encodeURIComponent` 传入），图形由该组件在自身挂载后写入自己的根节点，不查 document，页面上有几份 Markdown 互不干扰。`pele` 和 `mermaid` 都是动态 `import()`，没有图表就不会加载，未选中的驱动也不会加载。
 
 ## 环境要求
 
@@ -31,7 +46,7 @@ npm i mdi2esm
 同时安装 peer 依赖（用到哪些功能装哪些；完整能力需要全部）：
 
 ```sh
-npm i mdi2esm vue vue-style-runtime katex mermaid
+npm i mdi2esm vue vue-style-runtime katex mermaid pele
 ```
 
 ## 用法
@@ -39,57 +54,46 @@ npm i mdi2esm vue vue-style-runtime katex mermaid
 只出 HTML 字符串（不挂 Vue，纯 `innerHTML` 场景）：
 
 ```js
-import { renderMarkdown, renderMath, buildOutline, createConfig } from 'mdi2esm';
+import { renderMarkdown, buildOutline, createConfig } from 'mdi2esm';
 
 const config = createConfig();
-const { html, headings } = renderMarkdown('# 标题\n正文', { config });
-const finalHtml = await renderMath(html, config);
+const { html, headings } = await renderMarkdown('# 标题\n正文', { config });
 const outline = buildOutline(headings);
 ```
 
-挂成 Vue 组件——本页就是这段代码跑出来的，取自 `index.html` 的内联脚本（只去掉了大纲滚动同步这类页面细节）：
+挂成 Vue 组件——编译结果就是一个普通组件，是否响应式、什么时候重编译都由宿主决定：
 
 ```js
 import { Icon } from '@iconify/vue';
-import { createApp, h, shallowRef } from 'vue';
-import { createConfig, MarkdownContent } from 'mdi2esm';
+import { createApp, h } from 'vue';
+import { buildOutline, createConfig, createMarkdownComponent } from 'mdi2esm';
 
 import 'mdi2esm/index.min.css';
 import 'katex/dist/katex.min.css';
 
 import { VPBadge } from './vp-badge.js'; // 宿主自己写的 <Badge>
 
-// md 里用到的组件集中登记一处——库内一个都不含
-const HOST_COMPONENTS = { Icon, Badge: VPBadge };
-
 const config = createConfig({
+  mermaidDriver: 'pele', // 默认值；切原生渲染改成 'mermaid'
   markdown: { container: [{ type: 'demo', title: '自定义容器' }] },
 });
 
 // 1. 取源文本：库只吃字符串，跟构建工具无关——fetch、接口返回、textarea 内容都行
-//    放进 ref 就是响应式的：改一次 source.value 重编译一次（demo 的「渲染」按钮干的就这一件事）
-const source = shallowRef(await fetch('./README.md').then((res) => res.text()));
+const source = await fetch('./README.md').then((res) => res.text());
 
-// 2. 渲染就是一个标签：编译、注入组件、挂载都在内部完成
-createApp({
-  render: () => h(MarkdownContent, { source: source.value, config, components: HOST_COMPONENTS, onHeadings }),
-}).mount(document.getElementById('content'));
+// 2. markdown → 组件：frontmatter、Prism 高亮、KaTeX、<script setup> 都在内部处理
+const { component, headings } = await createMarkdownComponent(source, '', config);
 
-// 3. 大纲从组件抛出的 headings 生成（renderOutline 是 demo 自己的 DOM 渲染，见 index.html）
-function onHeadings(headings) {
-  renderOutline(buildOutline(headings), document.getElementById('outline'));
-}
+// 3. md 里用到的组件只注入到这一个实例，不污染全局
+component.components = { ...component.components, Icon, Badge: VPBadge };
+
+// 4. headings 是 [{ level, title, slug }]，buildOutline 整理成 { title, link, children } 的树
+const outline = buildOutline(headings);
+
+createApp({ render: () => h(component) }).mount(document.getElementById('content'));
 ```
 
-`<MarkdownContent>` 的入参都是纯数据，取文本、存文本、把大纲画成什么 DOM，全由调用方决定：
-
-| 属性 / 事件  | 说明                                                                                            |
-| ------------ | ----------------------------------------------------------------------------------------------- |
-| `source`     | markdown 文本；变化时自动重编译，内部按序号丢弃过期结果                                         |
-| `dir`        | 相对链接、相对 `import` 的基准目录                                                              |
-| `config`     | `createConfig()` 的产物；不传用默认配置                                                         |
-| `components` | md 里出现的组件（`<Icon>` / `<Badge>` …），只在编译时注入                                       |
-| `@headings`  | 编译完抛出 `[{ level, title, slug }]`，`buildOutline` 再整理成 `{ title, link, children }` 的树 |
+`createMarkdownComponent(source, dir, config, { frontmatter, params })` 的入参都是纯数据：`dir` 是相对链接、相对 `import` 的基准目录；返回 `{ component, headings }`。文本变化后的重编译与并发时序也由调用方决定——demo 在 `index.html` 里就是 `await createMarkdownComponent(...)` 后替换视图组件，并用递增序号丢弃过期结果。
 
 只要 HTML 字符串、不需要 Vue 组件时，用上面第一节的 `renderMarkdown`——两者的区别只在于要不要把结果挂成组件。
 
@@ -99,23 +103,24 @@ function onHeadings(headings) {
 
 ### 不打包：浏览器原生 ESM + importmap
 
-`dist/index.min.js` 本身就是浏览器可加载的 ESM，静态导入只有 `vue` 和 `vue-style-runtime` 两个（`katex` / `mermaid` 是动态 `import()`，用到才加载）。所以连 Vite 都不需要，importmap 映射 peer 即可：
+`dist/index.min.js` 本身就是浏览器可加载的 ESM，静态导入只有 `vue` 和 `vue-style-runtime` 两个（`katex` / `pele` / `mermaid` 是动态 `import()`，用到才加载）。所以连 Vite 都不需要，importmap 映射 peer 即可：
 
 ```html
 <script type="importmap">
   {
     "imports": {
       "vue": "/node_modules/vue/dist/vue.esm-browser.prod.js",
-      "vue-style-runtime": "/node_modules/vue-style-runtime/index.js"
+      "vue-style-runtime": "/node_modules/vue-style-runtime/dist/index.min.js",
+      "pele": "/node_modules/pele/dist/pele.js"
     }
   }
 </script>
 
 <script type="module">
   import { createApp, h } from 'vue';
-  import { createConfig, MarkdownContent } from '/node_modules/mdi2esm/dist/index.min.js';
+  import { createConfig, createMarkdownComponent } from '/node_modules/mdi2esm/dist/index.min.js';
 
-  // 组件就是一个带 template 字符串的对象，没有 SFC，也没有编译步骤
+  // 宿主组件就是一个带 template 字符串的对象，没有 SFC，也没有编译步骤
   const Badge = {
     props: ['text', 'type'],
     template: '<span class="badge" :data-type="type"><slot>{{ text }}</slot></span>',
@@ -125,9 +130,9 @@ function onHeadings(headings) {
   const config = createConfig();
 
   // 运行时编译，和打包场景一样
-  createApp({
-    render: () => h(MarkdownContent, { source, config, components: { Badge } }),
-  }).mount('#app');
+  const { component } = await createMarkdownComponent(source, '', config);
+  component.components = { ...component.components, Badge };
+  createApp({ render: () => h(component) }).mount('#app');
 </script>
 ```
 
@@ -139,11 +144,11 @@ function onHeadings(headings) {
 | Vite / Rollup | `resolve.alias: { vue: 'vue/dist/vue.esm-bundler.js' }` |
 | webpack       | `resolve.alias: { vue: 'vue/dist/vue.esm-bundler.js' }` |
 
-裸 `import ... from 'vue'` 在打包器里默认解析到 `vue.runtime.esm-bundler.js`，少了上面这条 alias，`MarkdownContent` 和 `createMarkdownComponent` 都会在 `compile is not a function` 上挂掉。上面「挂成 Vue 组件」的示例同样要配。
+裸 `import ... from 'vue'` 在打包器里默认解析到 `vue.runtime.esm-bundler.js`，少了上面这条 alias，`createMarkdownComponent` 会在 `compile is not a function` 上挂掉。上面「挂成 Vue 组件」的示例同样要配。
 
 本仓库的 demo 在 `index.html`（整页自包含：骨架、内联样式、内联脚本——宿主组件 `VPBadge` 与左编辑右预览逻辑都在里面），由 Vite 接管两种运行方式：
 
-- `npm run dev`：Vite 服务根目录 `index.html`，内联脚本里的裸导入由 Vite 重写到**源码**（`mdi2esm` 经 `vite.config.mjs` 的 alias 指到 `src/index.full.js`）——改 src 立即生效。
+- `npm run dev`：Vite 服务根目录 `index.html`，内联脚本里的裸导入由 Vite 重写到**源码**（`mdi2esm` 经 `vite.config.mjs` 的 alias 指到 `src/index.js`）——改 src 立即生效。
 - `npm run demo`（= build + `npm run preview`）：build 把 `index.html` 当入口打进 `dist/`，所有导入解析成打包产物，**dist 自包含**——整个目录发布到 GitHub Pages（或任意静态托管）就能直接演示，无 importmap、无 node_modules 依赖；`vite preview` 服务 dist（4180 端口）。
 
 推 `v*` Tag 时 GitHub Actions（`.github/workflows/publish.yml` 的 `pages` job）会构建并把 dist 部署到 `gh-pages` 分支（仓库 Pages 源需指向 gh-pages / root）。
@@ -157,7 +162,7 @@ createConfig(); // ./guide/a.md → /guide/a
 createConfig({ base: '/docs/' }); // ./guide/a.md → /docs/guide/a
 ```
 
-`base` 不会出现在配置对象上——`createConfig` 内部把它编成 `adapters`（`toHref` / `toSrc` / `toScriptImport` / `anchorHref` / `scriptContext`），渲染层只读 `config.adapters`，不会出现两个真相来源。需要非标准规则（比如把 `index.md` 归一成目录、把图片改写到 `/public`）时，覆写对应那一个函数即可，其余仍按 `base` 生成：
+`base` 不会出现在配置对象上——`createConfig` 内部把它编成 `adapters`（`toHref` / `toSrc` / `toScriptImport` / `scriptContext`），渲染层只读 `config.adapters`，不会出现两个真相来源。需要非标准规则（比如把 `index.md` 归一成目录、把图片改写到 `/public`）时，覆写对应那一个函数即可，其余仍按 `base` 生成：
 
 ```js
 createConfig({
@@ -215,10 +220,10 @@ import 'katex/dist/katex.min.css';
 
 ---
 
-| 能力       | 提供方               | 说明                             |
-| ---------- | -------------------- | -------------------------------- |
-| 表格可滚动 | applyTablePlugin     | 表格带 `tabindex="0"`            |
-| 实体还原   | applyRestoreEntities | 裸 `&` 转 `&amp;`，`&copy;` 保留 |
+| 能力       | 说明                             |
+| ---------- | -------------------------------- |
+| 表格可滚动 | 表格带 `tabindex="0"`            |
+| 实体还原   | 裸 `&` 转 `&amp;`，`&copy;` 保留 |
 
 A & B &copy; C，裸域名 example.com 不会自动成链（`fuzzyLink: false`）。
 
@@ -377,19 +382,20 @@ resolve: { alias: { '@iconify/vue': path.resolve('node_modules/@iconify/vue') } 
 
 库只内置 `ClientOnly`，md 里用到的自定义组件（`<Icon>`、`<Badge>` 等）都由宿主提供——否则模板里的标签解析不到，就是空白。
 
-用 `<MarkdownContent>` 时把它们写进 `components` 属性，注入在组件内部完成，不污染全局：
+用 `createMarkdownComponent` 编译出组件后，把 md 里用到的组件挂到它的 `components` 上，只对这一个实例生效，不污染全局：
 
 ```js
-h(MarkdownContent, { source, config, components: { Icon, Badge: VPBadge } });
+const { component } = await createMarkdownComponent(source, '', config);
+component.components = { ...component.components, Icon, Badge: VPBadge };
 ```
 
 底层是 Vue 自身的机制，两种写法任选其一：
 
-- **局部**（`<MarkdownContent>` 内部就是这么做的）：`component.components = { ...component.components, ...HOST_COMPONENTS }`，只对这一个 markdown 组件生效，不污染全局。
+- **局部**：`component.components = { ...component.components, ...HOST_COMPONENTS }`，只对这一个 markdown 组件生效。
 - **全局**：在 `createApp` 之后、`mount` 之前注册，整个 app 通用：
 
   ```js
-  const app = createApp({ render: () => h(MarkdownContent, { source, config }) });
+  const app = createApp({ render: () => h(component) });
   app.component('Icon', Icon); // 之后任意组件的模板里都能写 <Icon>
   app.component('Badge', MyBadge);
   app.mount(document.getElementById('app'));
@@ -399,7 +405,7 @@ h(MarkdownContent, { source, config, components: { Icon, Badge: VPBadge } });
 
 ### 在 Markdown 中使用 Vue
 
-Markdown 最终被编译成 Vue 模板，所以插值、指令和组件都能直接使用（与 VitePress 一致）；前提是走 `<MarkdownContent>` 或 `createMarkdownComponent`（都会把 md 编成模板再渲染），纯 `renderMarkdown` 只出 HTML 字符串。
+Markdown 最终被编译成 Vue 模板，所以插值、指令和组件都能直接使用（与 VitePress 一致）；前提是走 `createMarkdownComponent`（会把 md 编成模板再渲染），纯 `renderMarkdown` 只出 HTML 字符串。
 
 **插值**：1 + 1 = {{ 1 + 1 }}。
 
@@ -483,20 +489,7 @@ $$
 \int_0^1 x^2 \, dx = \frac{1}{3}
 $$
 
-段落内联 `$$a+b$$` 按块级处理；价格 \\$5 不会被误当成公式。公式由 `renderMath()` 异步渲染，样式需宿主引入 `katex/dist/katex.min.css`。
-
-## Mermaid 图表
-
-```mermaid
-graph TD
-  A[开始] --> B{判断}
-  B -->|是| C[结束]
-  B -->|否| A
-```
-
-点击右上角"深色"按钮切换主题，Mermaid 会随 `html.dark` 自动重绘。
-
-围栏会被渲染成 `<MermaidBlock graph="…">`（源码经 `encodeURIComponent` 传入），图形由该组件在自身挂载后写入自己的根节点，不查 document，页面上有几份 Markdown 互不干扰。`mermaid` 是动态 `import()`，没有图表就不会加载。
+段落内联 `$$a+b$$` 按块级处理；价格 \\$5 不会被误当成公式。公式由 `renderMarkdown` 内部异步渲染，样式需宿主引入 `katex/dist/katex.min.css`。
 
 ## 图片与缩放
 
@@ -582,29 +575,23 @@ const { html, lang, ok } = highlightBlock(code, 'ts', { meta: '{2,4-5}' });
 
 1. 宿主容器加 `mdi-code` 类，token 配色才会生效（`index.css` 里的规则是 `:is(.vp-doc, .mdi-code) .token`，深色走 `.dark`）。
 2. 行号、折行、最大高度等布局由宿主控制；`html` 里每行已包好 `.line`，行号用 `counter` 实现即可。
-3. 需要注册额外语言或直接用 `Prism.highlight` 时，用导出的 `Prism`：`Prism.languages.demo = {…}`。
 
 ## 公共 API
 
-包入口导出以下能力（无需记忆内部模块路径）：
+包入口只有六个导出：
 
-- 配置：`createConfig`、`createBaseAdapters`、`DEFAULT_CONFIG`、`DEFAULT_ADAPTERS`、`CONTAINER_LABELS`、`COPY_LABELS`
-- 渲染环境：`createRenderEnv`
-- 渲染：`renderMarkdown`、`renderSource`、`renderMath`、`md`（markdown-it 实例）、`ensureCustomContainers`、`ensureSyntaxPlugins`、`buildOutline`、`escapeInvalidInterpolations`、`resolvePath`
-- 代码块：`applyCodeBlock`、`maskFenceMarkers`、`unmaskFenceMarkers`、`highlightCode`、`highlightBlock`、`normalizeLang`、`Prism`
-- 组件：`MarkdownContent`（客户端标签式入口，支持 `app.use()` 全局注册）、`MermaidBlock`（```mermaid 的渲染组件，管线自动注册）
-- 管线：`createMarkdownComponent`、`extractTopLevelBlocks`
-- 其它：`parseFrontmatter`、`stripFrontmatter`
-- 浏览器脚本模块：`createScriptModule`、`createSetup`、`buildScriptModuleSource`、`buildSetupModuleSource`
-- Markdown 插件辅助：`anchorHref`、`normalizeHash`、`applyRestoreEntities`、`applyTablePlugin`、`applyLineNumbers`、`fenceMetaAttrs`、`escapeHtml`
+- 配置：`createConfig`
+- 渲染：`renderMarkdown`（markdown → HTML，KaTeX 已内部渲染）、`createMarkdownComponent`（markdown → Vue 组件）、`buildOutline`
+- 代码块：`highlightBlock`
+- 底层：`md`（共享的 markdown-it 实例，需要自己 `parse` token 时用）
 
-`renderMarkdown(source, { dir, config })` 返回 `{ html, headings }`；`renderMath(html, config)` 异步返回注入 KaTeX 后的 HTML；`buildOutline(headings)` 生成树形大纲。
+`renderMarkdown(source, { dir, config })` 异步返回 `{ html, headings }`；`createMarkdownComponent` 返回 `{ component, headings }`；`buildOutline(headings)` 生成树形大纲。`renderMath`、`maskFenceMarkers` 这类内部步骤不再导出。
 
 ## 开发
 
 ```sh
 npm install          # 安装依赖
-npm run build        # dist/index.js、dist/index.min.js、两份 CSS，外加 Vite 构建的自包含 demo（index.html + assets、public/、README.md）
+npm run build        # dist/index.js、dist/index.min.js、两份 CSS，外加 Vite 构建的自包含 demo（index.html + assets、public/、demo.md）
 npm run dev          # Vite 开发服务（根目录 index.html，引用 src 源码，改源码即时生效）
 npm run demo         # build + vite preview（http://127.0.0.1:4180），跑 dist 构建产物
 npm test             # 运行 node:test 测试
@@ -614,25 +601,24 @@ npm run lint:fix     # eslint 自动修复
 
 demo 只有这一种形态，整页自包含：`index.html` 一个文件集齐骨架、内联样式（宿主侧 `.vp-doc` 外壳）、内联脚本（宿主组件 `VPBadge` + 左编辑右预览逻辑）。dev 由 Vite 重写裸导入直跑源码；build 由 Vite 打进 `dist/`（所有依赖含 mermaid 异步 chunk、KaTeX 字体都在产物里），preview 与 GitHub Pages 消费的同一份产物。渲染源是包文档 README.md（构建时拷成 `dist/demo.md`，运行时 `fetch`——换名是为了不让 `files` 白名单把 dist 里的示例源带进 npm 包），改 README 要重新 `npm run build`。左列 textarea 编辑（输入防抖 400ms 实时预览），右列渲染结果，最右是大纲。
 
-库构建使用 Vite 8（rolldown 打包），只产出 `dist` 下的库文件，不构建 demo。宿主项目通过 npm 安装本包后，用 npm2esm 等工具预构建为浏览器 ESM 产物并配合 import map 使用。
+`npm run build` 由 `scripts/build.mjs` 驱动：先用 Vite 8（rolldown）产出库文件 `dist/index.js` / `dist/index.min.js` 与两份 CSS，再把同一份源码打进自包含 demo（`dist/index.html` + `assets/`、`public/`、`demo.md`）。宿主项目可以直接 `import 'mdi2esm'` 交给打包器处理；不打包时也可用 import map 手动映射 peer，见「不打包：浏览器原生 ESM + importmap」。
 
 ## 发布说明
 
 `package.json` 中的 `repository` / `homepage` / `bugs` 指向 `https://github.com/nbaxp/mdi2esm`。
 
-发布由 `.github/workflows/publish.yml` 承载：推送 `v*` Tag（或手动选择 `v*` Tag 且 `dry_run=false`）时，校验 Tag 与 `package.json` 版本一致，执行测试、lint、构建、`npm pack`、`npm publish <tgz>` 并创建 GitHub Release；手动触发默认只做 `npm publish --dry-run`。`dist` 被 gitignore、由 `npm run build` 生成，无需提交。
+发布由 `.github/workflows/publish.yml` 承载：推送 `v*` Tag 时，工作流依次安装依赖、lint、构建、测试，再用 OIDC Trusted Publisher 执行 `npm publish`，随后把 `dist` 部署到 `gh-pages`。`dist` 被 gitignore、由 `npm run build` 生成，无需提交。
 
 ### 首次发布（新包）
 
-CI 的 `npm publish` 走 OIDC Trusted Publisher，但**新包尚未发布时，npm 侧没有 Settings 页面，无法预先配置 Trusted Publisher**。因此首次推 Tag 会在 Publish 步骤返回 `404 Not Found`（不是包内容问题，前面测试/lint/build/pack 都会通过）。首次发布须按顺序：
+CI 的 `npm publish` 走 OIDC Trusted Publisher，但**新包尚未发布时，npm 侧没有 Settings 页面，无法预先配置 Trusted Publisher**。因此首次推 Tag 会在 Publish 步骤返回 `404 Not Found`（不是包内容问题，前面 lint/build/test 都会通过）。首次发布须按顺序：
 
-1. 本地构建并打包：`npm run build && npm pack`，得到 `mdi2esm-<version>.tgz`。
-2. 本地用 2FA OTP 发首版：`npm publish mdi2esm-<version>.tgz --access public --otp=<OTP>`。
-3. 包发布后，到 https://www.npmjs.com/package/mdi2esm/settings/access → Trusted Publisher → GitHub Actions，填 owner `nbaxp`、repo `mdi2esm`、workflow `publish.yml` 保存。
-4. 之后推 `v*` Tag 即可由 CI 用 OIDC 自动发布，无需 OTP。
+1. 本地 `npm login`（需 npm 账号 2FA），然后 `npm publish --otp=<OTP>`；`prepublishOnly` 会自动构建、测试、lint。
+2. 包发布后，到 https://www.npmjs.com/package/<包名>/settings/access → Trusted Publisher → GitHub Actions，填 owner、repo、workflow `publish.yml` 保存。
+3. 之后推 `v*` Tag 即可由 CI 用 OIDC 自动发布，无需 OTP。
 
 ### 后续发版
 
-1. 确认 `npm test`、`npm run lint` 全过。
-2. `npm version patch` / `minor` / `major` 更新版本并打同名 Tag（如 `v0.1.2`）。
-3. 提交改动、推送 `main` 与 Tag；工作流自动完成构建、发布与 Release。
+1. 修改 `package.json` 的 `version` 并提交。
+2. `git tag vX.Y.Z && git push origin main vX.Y.Z`。
+3. 工作流自动完成 lint、构建、测试、发布，并把 demo 部署到 `gh-pages`。

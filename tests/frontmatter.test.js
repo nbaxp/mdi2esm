@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { parseFrontmatter, stripFrontmatter } from '../src/index.js';
+import { parseFrontmatter, stripFrontmatter } from '../src/frontmatter.js';
 
 test('标准 frontmatter：顶部 --- 包裹 YAML', () => {
   assert.equal(stripFrontmatter('---\ntitle: 你好\n---\n# 正文'), '# 正文');
