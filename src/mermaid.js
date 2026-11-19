@@ -23,7 +23,19 @@ const cssVar = (name, fallback) => {
   return value || fallback;
 };
 
-// Mermaid 配色从页面 CSS 变量取；Pele 直接继承 --pele-* 变量，主题切换无需重绘
+// Pele 的 SVG 用 --pele-* 变量着色；这里从页面 --vp-* 派生并内联到组件根节点，
+// 宿主只引 JS、不引包内 CSS（如 mdoc 复用自刻 VitePress 主题）也能随暗色主题切换
+const PELE_VARS = {
+  '--pele-bg': 'var(--vp-c-bg)',
+  '--pele-fg': 'var(--vp-c-text-1)',
+  '--pele-muted': 'var(--vp-c-text-2)',
+  '--pele-line': 'var(--vp-c-text-2)',
+  '--pele-surface': 'var(--vp-c-bg-soft)',
+  '--pele-surface-alt': 'var(--vp-c-bg-alt)',
+  '--pele-border': 'var(--vp-c-divider)',
+};
+
+// Mermaid 驱动配色从页面 CSS 变量取，主题切换时重绘
 function mermaidConfig() {
   const bg = cssVar('--vp-c-bg', '#ffffff');
   const bgSoft = cssVar('--vp-c-bg-soft', bg);
@@ -128,7 +140,11 @@ export function createMermaidBlock(driver = 'pele') {
       // 渲染出来之前（以及失败时）显示源码，不留空白
       return () =>
         svg.value
-          ? h('div', { class: 'mermaid-rendered', innerHTML: svg.value })
+          ? h('div', {
+              class: 'mermaid-rendered',
+              style: driver === 'mermaid' ? undefined : PELE_VARS,
+              innerHTML: svg.value,
+            })
           : h('pre', { class: 'mermaid-source' }, source());
     },
   };

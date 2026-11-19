@@ -1216,15 +1216,9 @@
 }
 
 /* ---- Mermaid / 数学占位 ---- */
+/* pele 的 --pele-* 配色变量由 MermaidBlock 组件内联（src/mermaid.js）从 --vp-* 派生，
+   不依赖本 CSS：宿主只引 JS 时暗色模式同样生效 */
 .vp-doc .mermaid-rendered {
-  --pele-bg: var(--vp-c-bg);
-  --pele-fg: var(--vp-c-text-1);
-  --pele-muted: var(--vp-c-text-2);
-  --pele-line: var(--vp-c-text-2);
-  --pele-surface: var(--vp-c-bg-soft);
-  --pele-surface-alt: var(--vp-c-bg-alt);
-  --pele-border: var(--vp-c-divider);
-
   margin: 1rem 0;
   overflow-x: auto;
 }

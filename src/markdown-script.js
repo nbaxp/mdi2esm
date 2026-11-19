@@ -47,7 +47,9 @@ export function buildScriptModuleSource(scripts, dir, config = createConfig()) {
   const plain = scripts.filter((item) => !/\bsetup\b/.test(item.attrs));
   if (plain.length === 0) return null;
   const { importLines, body } = hoistImports(plain.map((item) => item.content).join('\n'), dir, config);
-  return body.trim() ? `${importLines}\n${body}` : null;
+  // 只有 import、没有其它语句时也要保留，副作用 import 不能丢
+  const source = `${importLines}\n${body}`.trim();
+  return source || null;
 }
 
 async function importModuleSource(moduleSource, onError) {

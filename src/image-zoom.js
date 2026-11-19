@@ -15,14 +15,15 @@ function ensureZoomCss() {
   document.head.append(style);
 }
 
-function zoomableImages() {
-  return Array.from(document.querySelectorAll('.vp-doc img')).filter(
+function zoomableImages(root) {
+  return Array.from(root.querySelectorAll('img')).filter(
     (img) => !img.closest('a') && !img.closest('.mermaid-rendered'),
   );
 }
 
-export async function mountImageZoom() {
-  const images = zoomableImages();
+export async function mountImageZoom(root) {
+  if (!root) return;
+  const images = zoomableImages(root);
   if (images.length === 0) return;
 
   const module = await loadZoom();

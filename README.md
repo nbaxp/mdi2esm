@@ -30,7 +30,7 @@ graph TD
 
 点击右上角"深色"按钮切换主题：Pele 通过 CSS 变量换色，Mermaid 会随 `html.dark` 自动重绘。
 
-围栏会被渲染成 `<MermaidBlock graph="…">`（源码经 `encodeURIComponent` 传入），图形由该组件在自身挂载后写入自己的根节点，不查 document，页面上有几份 Markdown 互不干扰。`pele` 和 `mermaid` 都是动态 `import()`，没有图表就不会加载，未选中的驱动也不会加载。
+围栏会被渲染成 `<MermaidBlock graph="…">`（源码经 `encodeURIComponent` 传入），图形由该组件在自身挂载后写入自己的根节点，不查 document，页面上有几份 Markdown 互不干扰。`pele` 和 `mermaid` 都是动态 `import()`，没有图表就不会加载，未选中的驱动也不会加载。`pele` 的 `--pele-*` 配色变量由组件内联从 `--vp-*` 派生，宿主不引包内 CSS（如只引 JS 的宿主）也能随暗色主题切换。
 
 ## 环境要求
 
@@ -99,7 +99,7 @@ createApp({ render: () => h(component) }).mount(document.getElementById('content
 
 `index.html` 里取源文本就是一句 `fetch('./README.md')`——库只吃字符串，文本从哪来跟它无关，`fetch`、接口返回、`textarea` 内容都一样。
 
-`package.json` 的 `exports` 提供两个 JS 入口：默认（生产）指向压缩版 `dist/index.min.js`，`development` 条件指向未压缩的 `dist/index.js`；也可显式用 `mdi2esm/index` 与 `mdi2esm/index.min`。
+`package.json` 的 `exports`：`.`（默认/生产 → `dist/index.min.js`，`development` → `dist/index.js`），显式 JS 入口 `mdi2esm/index`、`mdi2esm/index.min`，样式入口 `mdi2esm/index.css`、`mdi2esm/index.min.css`。
 
 ### 不打包：浏览器原生 ESM + importmap
 
@@ -327,7 +327,7 @@ const config = createConfig({
 | `:i-集合-名字:` | `<Icon icon="集合:名字" />` | `i-` 是固定前缀，第一段是集合，其余是图标名 |
 | `:名字:`        | 对应的 emoji 字符           | 由 markdown-it-emoji（full 数据）渲染，见下 |
 
-- **emoji 不内置**：库动态 `import('markdown-it-emoji')`（full 数据，GitHub / VitePress 同套），宿主提供了就启用；没装时静默回退，`:名字:` 按普通文本原样保留。demo 已装该包，构建时直接打进产物（npm 包消费者仍需自行安装——库对它是可选 peer）。
+- **emoji 不内置**：库动态 `import('markdown-it-emoji')`（full 数据，GitHub / VitePress 同套），宿主提供了就启用；没装时静默回退，`:名字:` 按普通文本原样保留。demo 已装该包，demo 构建会把它打进 `dist`；库产物仍将它外部化，npm 包消费者需自行安装（可选 peer）。
 - **图标规则不受影响**：`:i-mdi-home:` 翻成 `<Icon>`；`:i-foo:` 这种形状不完整的保持原文，不会被 emoji 接走。
 - **不误判**：`12:30:00`、`1:2:3` 这类时间和版本号不在 emoji 短码表里，原样保留。
 - 代码块与行内代码里不生效（markdown-it 自身隔离）。

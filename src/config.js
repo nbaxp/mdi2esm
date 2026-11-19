@@ -88,6 +88,8 @@ const localeKey = (locale) =>
 export function createConfig({ base = '/', adapters, ...overrides } = {}) {
   const locale = overrides.locale ?? DEFAULT_CONFIG.locale;
   const key = localeKey(locale);
+  // 宿主只覆写单个函数；显式写 undefined 不算覆写，避免把默认实现顶掉
+  const patch = adapters ? Object.fromEntries(Object.entries(adapters).filter(([, fn]) => fn != null)) : {};
   return {
     ...DEFAULT_CONFIG,
     ...overrides,
@@ -97,7 +99,7 @@ export function createConfig({ base = '/', adapters, ...overrides } = {}) {
       container: overrides.labels?.container ?? CONTAINER_LABELS[key],
       copy: overrides.labels?.copy ?? COPY_LABELS[key],
     },
-    adapters: { ...createBaseAdapters(base), ...adapters },
+    adapters: { ...createBaseAdapters(base), ...patch },
   };
 }
 

@@ -94,9 +94,9 @@ export async function createMarkdownComponent(source, dir, config, { frontmatter
   const data = frontmatter ?? parsed.data;
   const { body, scripts, styles } = extractTopLevelBlocks(parsed.body);
   // markdown-it-emoji 不内置：装了就挂上（幂等），没装静默跳过，渲染结果不受影响
+  if (!body.trim()) return { component: null, headings: [] };
   await ensureEmojiPlugin();
   const { html, headings } = await renderMarkdown(body, { dir, config });
-  if (!body.trim()) return { component: null, headings: [] };
 
   const options = {
     // 不给 name：这是每份 md 一次性编出来的渲染组件，同名只会在 devtools 里混淆
@@ -112,7 +112,8 @@ export async function createMarkdownComponent(source, dir, config, { frontmatter
     },
     // 图片缩放：medium-zoom 动态加载，仅当正文有可放大图片时挂载
     async mounted() {
-      await mountImageZoom().catch(() => {});
+      // 只在组件根节点内装配缩放，多份 md 同页互不干扰
+      await mountImageZoom(this.$el).catch(() => {});
     },
   };
   // 普通 <script>：默认导出选项对象（components/data/methods…）并入组件，正文即可用其注册的组件标签

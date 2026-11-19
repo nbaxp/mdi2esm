@@ -30,13 +30,13 @@
 - 先挂纯规则（`applyRestoreEntities` 实体还原、`applyTablePlugin` 表格 `tabindex`），再按次序 `md.use(...)` 第三方插件（attrs / tasklist / footnote / mark / sub / sup / cjkFriendly / anchor / toc）。
 - `@mdit/plugin-container` 被复用注册 v-pre / raw / code-group / details 等容器；github-alerts 是**自研 core 规则**（`md.core.ruler.after('block', ...)`），不是插件。
 - 行内图标短码（`:i-集合-图标:`）、数学公式（`math_inline` / `math_block`）用 `ruler.after/before` 插入。
-- **配置装配的幂等性因项而异**：`mark/sub/sup` 关闭（`syntaxConfigured`）与 emoji 挂载（`emojiMounted`）只执行一次，**首渲染后锁定**；自定义容器则每次渲染都检查、新容器**累积注册**（`registeredCustomContainers` 仅去重）。因为 `md` 是单例，同一进程内不支持多套配置共存（见 §3.6）。
+- **配置装配的幂等性因项而异**：`mark/sub/sup` 关闭（`syntaxConfigured`）只执行一次，**首渲染后锁定**；emoji 挂载经 `emojiReady ??=` 缓存，只挂一次，但它是异步的——`renderMarkdown` 不等待，首次渲染可能尚未启用 emoji（`createMarkdownComponent` 会在渲染前 `await`）；自定义容器则每次渲染都检查、新容器**累积注册**（`registeredCustomContainers` 仅去重）。因为 `md` 是单例，同一进程内不支持多套配置共存（见 §3.6）。
 
 ### 2.3 渲染管线
 
 ```
 Markdown 原文
-  → extractParts              （parseFrontmatter + 顶层 <script>/<style> 提取，围栏内不动）
+  → parseFrontmatter + extractTopLevelBlocks（frontmatter 剥离 + 顶层 <script>/<style> 提取，围栏内不动）
   → maskFenceMarkers          （保护代码块，避免被后续处理破坏）
   → md.render(source, env)    （markdown-it，env 承载 dir/adapters/labels/headings）
   → unmaskFenceMarkers
@@ -46,7 +46,7 @@ Markdown 原文
   → defineComponent(...)      （markRaw 包裹）
 ```
 
-`extractParts` 在 `renderMarkdown` 与 `createMarkdownComponent` 都会调用；frontmatter 解析器仅 `createMarkdownComponent` 可通过 `frontmatterParser` 参数替换。`env` 由 `createRenderEnv(config, page)` 展开：规则回调一律从 `env` 取 `dir` / `adapters` / `containerLabels` / `copyLabels`，避免模块级可变单例。`headings` 在渲染期由 anchor 插件的 permalink 回调按出现顺序收集（h2–h6），渲染完再 `buildOutline` 组装成目录树。
+`createMarkdownComponent` 用 `parseFrontmatter`（可经 `frontmatterParser` 替换）+ `extractTopLevelBlocks` 取得 body 与脚本/样式；`renderMarkdown` 只接收 body，frontmatter 由调用方自行处理。`env` 由 `createRenderEnv(config, page)` 展开：规则回调一律从 `env` 取 `dir` / `adapters` / `containerLabels` / `copyLabels`，避免模块级可变单例。`headings` 在渲染期由 anchor 插件的 permalink 回调按出现顺序收集（h2–h6），渲染完再 `buildOutline` 组装成目录树。
 
 ### 2.4 路径处理：adapters
 
@@ -74,7 +74,7 @@ URL 的**拼装规则**交给 `config.adapters` 的四个函数（`src/config.js
 
 - **`<script setup>`**：`hoistImports` 把 `import` 提到模块顶层，相对说明符经 `toScriptImport` 变成**绝对 URL**（Blob URL 无相对基准，这是硬约束）；随后拼出 `export function setup() { ... return { bindings } }`，用 `URL.createObjectURL(new Blob([source]))` 动态 `import()`，取出 `setup` 作为组件的 `setup`。
 - **普通 `<script>`**：默认导出（选项对象）并入组件选项，`mounted` 与管线 mounted 链式合并；`render/template` 视为 markdown 正文忽略。
-- **数据注入**：`frontmatter` 挂到实例（`beforeCreate` 设 `$frontmatter`），并经 `scriptContext` 注入 setup 作用域；`params` 同时以 `attrs.params`（模拟 SFC `defineProps`）和 setup 闭包常量两条通道提供。
+- **数据注入**：`frontmatter` 挂到实例（`beforeCreate` 设 `$frontmatter`），并经 `scriptContext` 注入 setup 作用域；`params` 仅经 `scriptContext` 注入 setup 闭包常量，不作为组件 props 暴露（见 §3.6）。
 - **失败降级**：脚本执行/解析失败时 `console.warn` 并降级为无脚本渲染，不影响正文。
 
 ### 2.6 可选依赖与惰性加载
@@ -90,33 +90,35 @@ URL 的**拼装规则**交给 `config.adapters` 的四个函数（`src/config.js
 
 - 内置 `ClientOnly`（`<slot/>` 占位）与 `MermaidBlock`（图形由组件在自身挂载后写自己的根节点，不查 `document`，多份 md 互不干扰）；
 - `Icon` 由宿主注入，包内不持有组件、不内置图标集；
-- `markRaw` 包裹组件，避免 Vue 对编译产物做响应式代理。
+- `markRaw` 包裹组件，避免 Vue 对编译产物做响应式代理；
+- 图片缩放在**组件根节点内**查找（`mountImageZoom(this.$el)`），多份 md 同页互不干扰，不依赖全局 `.vp-doc` 选择器。
+- Mermaid 的 `pele` 驱动配色由组件内联 `--pele-*`（从 `--vp-*` 派生），不依赖包内 CSS 是否被引入；`mermaid` 驱动在挂载时按 `html.dark` 选主题，并在 `.dark` 切换时重绘。
 
 ## 3. 当前实现
 
 ### 3.1 文件结构
 
-| 文件                          | 职责                                                                                                  |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `src/index.js`                | 包入口，只导出公共 API                                                                                |
-| `src/config.js`               | `createConfig` / `createRenderEnv` / `createBaseAdapters` / 默认文案                                  |
-| `src/markdown-it.js`          | markdown-it 实例与插件装配、锚点/目录、容器、github-alerts、数学占位、图标短码                        |
-| `src/render.js`               | `renderMarkdown` / `buildOutline` / `link_rewrite`（链接重写 core 规则）                              |
-| `src/pipeline.js`             | `createMarkdownComponent`：frontmatter → 块提取 → 渲染 → 组件装配                                     |
-| `src/markdown-script.js`      | `<script>` / `<script setup>` 的模块拼接与 Blob 加载                                                  |
-| `src/markdown-plugins.js`     | 官方纯规则：实体还原、表格、语言提取、hash 归一化                                                     |
-| `src/code-block.js`           | 代码块 `preWrapper`/`v-pre`/围栏 marker 保护                                                          |
-| `src/code-lines.js`           | 行号与高亮行的 HTML 切分                                                                              |
-| `src/prism.js`                | Prism 封装（语言别名归一、同步高亮）                                                                  |
-| `src/code-block-component.js` | 独立 `highlightBlock` 组件（预览/复制）                                                               |
-| `src/math.js`                 | KaTeX 占位标记的运行时替换                                                                            |
-| `src/mermaid.js`              | `MermaidBlock` 组件与双驱动（pele/mermaid）                                                           |
-| `src/image-zoom.js`           | medium-zoom 图片放大                                                                                  |
-| `src/frontmatter.js`          | frontmatter 剥离与内置子集解析（可替换）                                                              |
-| `src/lazy-module.js`          | 可选依赖的惰性加载封装                                                                                |
-| `src/styles/`                 | `doc.css`（正文/容器/代码）、`prism.css`（高亮主题）、`icons.css`（图标样式）、`vars.css`（主题变量） |
+| 文件                          | 职责                                                                                                                                                                                             |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/index.js`                | 包入口，只导出公共 API                                                                                                                                                                           |
+| `src/config.js`               | `createConfig` / `createRenderEnv` / `createBaseAdapters` / 默认文案                                                                                                                             |
+| `src/markdown-it.js`          | markdown-it 实例与插件装配、锚点/目录、容器、github-alerts、数学占位、图标短码                                                                                                                   |
+| `src/render.js`               | `renderMarkdown` / `buildOutline` / `link_rewrite`（链接重写 core 规则）                                                                                                                         |
+| `src/pipeline.js`             | `createMarkdownComponent`：frontmatter → 块提取 → 渲染 → 组件装配                                                                                                                                |
+| `src/markdown-script.js`      | `<script>` / `<script setup>` 的模块拼接与 Blob 加载                                                                                                                                             |
+| `src/markdown-plugins.js`     | 官方纯规则：实体还原、表格、语言提取、hash 归一化                                                                                                                                                |
+| `src/code-block.js`           | 代码块 `preWrapper`/`v-pre`/围栏 marker 保护                                                                                                                                                     |
+| `src/code-lines.js`           | 行号与高亮行的 HTML 切分                                                                                                                                                                         |
+| `src/prism.js`                | Prism 封装（语言别名归一、同步高亮）                                                                                                                                                             |
+| `src/code-block-component.js` | 独立 `highlightBlock` 组件（预览/复制）                                                                                                                                                          |
+| `src/math.js`                 | KaTeX 占位标记的运行时替换                                                                                                                                                                       |
+| `src/mermaid.js`              | `MermaidBlock` 组件与双驱动（pele/mermaid）                                                                                                                                                      |
+| `src/image-zoom.js`           | medium-zoom 图片放大                                                                                                                                                                             |
+| `src/frontmatter.js`          | frontmatter 剥离与内置子集解析（可替换）                                                                                                                                                         |
+| `src/lazy-module.js`          | 可选依赖的惰性加载封装                                                                                                                                                                           |
+| `src/styles/`                 | `index.css`（样式入口：`@import` vars/icons/doc，构建合并为 `dist/index.css`）、`doc.css`（正文/容器/代码 + Prism token 配色）、`icons.css`（copy / external-link 图标）、`vars.css`（主题变量） |
 
-构建：`scripts/build.mjs` 组织库与根 demo 的构建；`vite.config.mjs` 定义 `dist` 产物与根 `index.html` 的 alias。
+仓库根另有 demo 页面 `index.html`（左编辑右预览，示例图片在 `public/`）与 `scripts/build.mjs`；`vite.config.mjs` 提供 `vue` / `mdi2esm` 别名，dev、build、preview 共用。
 
 ### 3.2 公共 API
 
@@ -129,35 +131,40 @@ URL 的**拼装规则**交给 `config.adapters` 的四个函数（`src/config.js
 - `highlightBlock(props)` → 独立代码块组件
 - `md` → markdown-it 实例（供特殊扩展，一般不用）
 
-内部步骤（`resolvePath` 虽从 `render.js` 导出，`maskFenceMarkers`、`renderMath` 等）不视为稳定 API。
+内部步骤（`resolvePath`、`maskFenceMarkers`、`renderMath`、`escapeInvalidInterpolations` 等）不视为稳定 API。
 
 ### 3.3 关键流程（代码位置）
 
 - **配置注入**：`createConfig`（`config.js`）把 `base` 编进 `adapters`，展开默认值与宿主覆盖；`createRenderEnv` 生成每次渲染的 `env`。
-- **渲染**：`renderMarkdown`（`render.js`）负责围栏保护、`md.render`、公式增强、插值转义；链接/图片重写在 `link_rewrite`（`render.js` 的 `core.ruler.push`）里完成。
+- **渲染**：`renderMarkdown`（`render.js`）负责围栏保护、`md.render`、公式增强；插值转义在 `createMarkdownComponent` 编译前完成。链接/图片重写在 `link_rewrite`（`render.js` 的 `core.ruler.push`）里完成。
 - **组件**：`createMarkdownComponent`（`pipeline.js`）串起 frontmatter、块提取、emoji 就绪、渲染、脚本模块、样式注入、组件定义。
 - **脚本**：`hoistImports` / `buildSetupModuleSource` / `importModuleSource`（`markdown-script.js`）。
 - **rebase**：`<!-- @include-start: dir -->` 标记由宿主（如 mdoc 的 source-expander）生成，渲染层在 `link_rewrite` 里消费并切换 `dir` 栈，使被包含文件的相对链接按其目录解析。
 
 ### 3.4 样式产物
 
-- `dist/index.css` = `doc.css`（必带）；
-- `dist/prism.css` = 高亮主题（可替换）；
+- `dist/index.css` = `vars.css` + `icons.css` + `doc.css`（含 Prism token 配色，必带）；
+- 没有独立 `prism.css`：配色是 `doc.css` 的一部分，换主题改 `--vp-*` / `.dark` 变量或直接覆盖 `.token` 规则。
 - 宿主主题变量与 `vp-doc` / `mdi-code` 选择器约定见 `doc.css`（接入细节见 README 样式章节）。
 
 ### 3.5 构建与分发
 
 - `npm run build`：产出 `dist/index.js`、`dist/index.min.js`、两份 CSS，外加 Vite 构建的根 demo（自包含）。
-- `package.json` 的 `exports` 提供 `./`、`./index.min.js`、`./index.css`、`./prism.css` 四个入口。
-- **dependencies**：vue / vue-style-runtime（Vue 运行时，浏览器原生 ESM 的静态导入）；**peerDependencies**：vue（宿主提供）；可选 peer：markdown-it-emoji、katex、mermaid、pele、medium-zoom、@iconify/vue（依赖清单与脚本见 README）。
+- `package.json` 的 `exports`：`.`（`development` → `dist/index.js`，默认 → `dist/index.min.js`）、`./index`、`./index.min`、`./index.css`、`./index.min.css`、`./package.json`。
+- **dependencies**：markdown-it 栈（`markdown-it` / `@mdit/*` / `@mdit-vue/*` / `markdown-it-cjk-friendly`）与 `prismjs`（构建期内联进产物）；**peerDependencies**：`vue`、`vue-style-runtime`（宿主提供，产物静态导入）；可选 peer：markdown-it-emoji、katex、mermaid、pele、medium-zoom、@iconify/vue（依赖清单与脚本见 README）。
 
 ### 3.6 已知边界（实现现状）
 
-- **单例限制**：`md` 是模块级单例，`mark/sub/sup` 开关与 emoji 在首次渲染后锁定；自定义容器则跨 config 累积注册。同一进程内不能同时服务两套不同配置。
+- **单例限制**：`md` 是模块级单例，`mark/sub/sup` 开关首渲染后锁定，emoji 挂载只一次（异步）；自定义容器则跨 config 累积注册。同一进程内不能同时服务两套不同配置。
 - **无 SSR**：渲染在浏览器完成，产物是客户端组件。
 - **顶层脚本只认第一个**：`<script>` 只提取第一处，其后正文中的 `<script>` 视为文档内容。
 - **默认路由语义有限**：`createBaseAdapters` 只剥 `.md`、不归一化 `index`；路由规则由宿主覆写（见 README 的 mdoc 示例）。
 - **`<base>` 不参与**：路径前缀由 `adapters` 显式计算，不依赖文档 `<base>`（`<base>` 无法覆盖相对解析与 script 绝对化，见 README 部署路径章节）。
+- **脚本 import 用正则解析**：`hoistImports` 以 `IMPORT_RE` 提取 `import ... from '...'`，不覆盖注释/字符串内的伪 import、动态 `import()` 与多行写法。
+- **仅 import 的普通 `<script>` 会保留**：`buildScriptModuleSource` 在只有 import、没有其它语句时也产出模块，避免副作用 import 丢失。
+- **插值检测受 CSP 影响**：`escapeInvalidInterpolations` 用 `new Function` 判断表达式合法性，`unsafe-eval` 受限时会把合法插值也转义成字面量。
+- **重写只覆盖 markdown 语法**：raw HTML 里的 `<a>` / `<img>` 不参与 `link_rewrite`。
+- **`params` 不是组件 props**：只注入 `<script setup>` 作用域（`const params = ...`），模板要直接用需经 setup 返回。
 
 ## 4. 与宿主（mdoc）的集成要点
 
