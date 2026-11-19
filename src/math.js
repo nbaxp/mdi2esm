@@ -1,18 +1,13 @@
 // KaTeX 公式渲染：入口只产出占位标记，这里按需加载 katex 并替换。
 // katex 本体与它的 CSS 都由调用方提供——样式由宿主自己 import，库不注入 <link>。
-let katexModule;
+import { lazyModule } from './lazy-module.js';
 
-async function loadKatex() {
-  katexModule ??= import('katex').catch(() => null);
-  return katexModule;
-}
+const loadKatex = lazyModule(() => import('katex'));
 
-// 解码 md.utils.escapeHtml 对 TeX 做的实体转义（& < > " '）。
-// ' 由 escapeHtml 也编码为 &#39;，这里一并覆盖。
+// 解码 md.utils.escapeHtml 对 TeX 做的实体转义：markdown-it 只转义 & < > "，不含单引号
 function decodeAttr(value) {
   return value
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&amp;/g, '&');

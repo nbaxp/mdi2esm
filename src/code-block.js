@@ -2,8 +2,8 @@
 // 复制与 code-group 切换的点击委托也在这里：文档级一次委托（对齐 VitePress copyCode/codeGroups），
 // 换剪贴板策略或改 tab 行为时改这一个文件即可，宿主零配置。
 import { wrapCodeLines } from './code-lines.js';
-import { highlightCode } from './highlight.js';
 import { applyLineNumbers, extractLang, fenceMetaAttrs } from './markdown-plugins.js';
+import { highlightCode } from './prism.js';
 
 const COPY_RESET_MS = 2000;
 const copyTimers = new WeakMap();

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { highlightCode, normalizeLang } from '../src/highlight.js';
 import { renderMarkdown } from '../src/index.js';
+import { highlightCode, normalizeLang } from '../src/prism.js';
 
 test('Prism 高亮：C# 关键字输出 token 类', () => {
   const html = highlightCode('public class A {}', 'csharp');

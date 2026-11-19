@@ -67,7 +67,7 @@ export function ensureEmojiPlugin() {
   return emojiReady;
 }
 
-// 标题锚点：permalink 对齐官方 .header-anchor 与 aria-label，顺带收集 h2/h3 供目录
+// 标题锚点：permalink 对齐官方 .header-anchor 与 aria-label，顺带收集 h2–h6 供目录
 md.use(anchor, {
   slugify,
   tabIndex: false,
@@ -381,9 +381,3 @@ export function ensureCustomContainers(config) {
 applyCodeBlock(md);
 
 export default md;
-export { md };
-
-// 直接渲染入口（部分旧调用点用得到）
-export function render(source, env) {
-  return md.render(source, env);
-}

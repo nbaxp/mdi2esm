@@ -34,8 +34,6 @@ function hoistImports(code, dir, config) {
     const target = config.adapters.toScriptImport({
       spec,
       resolved: spec.startsWith('.') ? resolvePath(dir, spec) : spec,
-      dir,
-      config,
     });
     importLines.push(clause ? `import ${clause} from '${target}';` : `import '${target}';`);
     if (clause) bindings.push(...parseImportClause(clause).map(({ local }) => local));
@@ -78,7 +76,7 @@ export function buildSetupModuleSource(scripts, dir, frontmatter, params, config
   const setup = scripts.filter((item) => /\bsetup\b/.test(item.attrs));
   if (setup.length === 0) return null;
   const { importLines, body, bindings } = hoistImports(setup.map((item) => item.content).join('\n'), dir, config);
-  const ctx = config.adapters.scriptContext({ dir, config, frontmatter, params });
+  const ctx = config.adapters.scriptContext({ frontmatter, params });
   const injected =
     `const frontmatter = ${JSON.stringify(ctx.frontmatter ?? {})};\n` +
     `const params = ${JSON.stringify(ctx.params ?? {})};\n`;

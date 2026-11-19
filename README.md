@@ -26,7 +26,7 @@ graph TD
   B -->|否| A
 ```
 
-默认由 **Pele** 渲染，可通过 `createConfig({ mermaidDriver: 'mermaid' })` 切回 Mermaid；可选值只有 `pele` 和 `mermaid`，没有自动回退模式。原生 ESM demo 顶部可以直接切换并对比同一图源。
+默认由 **Pele** 渲染，可通过 `createConfig({ mermaidDriver: 'mermaid' })` 切回 Mermaid；可选值只有 `pele` 和 `mermaid`，没有自动回退模式。demo 顶部可以直接切换并对比同一图源。
 
 点击右上角"深色"按钮切换主题：Pele 通过 CSS 变量换色，Mermaid 会随 `html.dark` 自动重绘。
 
@@ -149,7 +149,7 @@ createApp({ render: () => h(component) }).mount(document.getElementById('content
 本仓库的 demo 在 `index.html`（整页自包含：骨架、内联样式、内联脚本——宿主组件 `VPBadge` 与左编辑右预览逻辑都在里面），由 Vite 接管两种运行方式：
 
 - `npm run dev`：Vite 服务根目录 `index.html`，内联脚本里的裸导入由 Vite 重写到**源码**（`mdi2esm` 经 `vite.config.mjs` 的 alias 指到 `src/index.js`）——改 src 立即生效。
-- `npm run demo`（= build + `npm run preview`）：build 把 `index.html` 当入口打进 `dist/`，所有导入解析成打包产物，**dist 自包含**——整个目录发布到 GitHub Pages（或任意静态托管）就能直接演示，无 importmap、无 node_modules 依赖；`vite preview` 服务 dist（4180 端口）。
+- `npm run build && npm run preview`：build 把 `index.html` 当入口打进 `dist/`，所有导入解析成打包产物，**dist 自包含**——整个目录发布到 GitHub Pages（或任意静态托管）就能直接演示，无 importmap、无 node_modules 依赖；`vite preview` 服务 dist（4180 端口）。
 
 推 `v*` Tag 时 GitHub Actions（`.github/workflows/publish.yml` 的 `pages` job）会构建并把 dist 部署到 `gh-pages` 分支（仓库 Pages 源需指向 gh-pages / root）。
 
@@ -555,7 +555,7 @@ createMarkdownComponent(source, dir, config, { frontmatter: page.fm });
 
 ## 大纲
 
-右侧"大纲"栏由 `buildOutline(headings)` 从本页 h2/h3 生成，试试增删二级/三级标题，大纲会同步更新。它的尺寸、层级与状态取值与 VitePress 的 `VPDocAsideOutline` / `VPDocOutlineItem` 一致：1px 发丝线、1rem 内缩、链接 14px / 行高 2.2857143、当前项取 `--vp-c-text-1`，另带图样相同的 2px `.outline-marker`。
+右侧“大纲”栏由 `buildOutline(headings)` 从本页 h2–h6 生成，试试增删二级/三级标题，大纲会同步更新。它的尺寸、层级与状态取值与 VitePress 的 `VPDocAsideOutline` / `VPDocOutlineItem` 一致：1px 发丝线、1rem 内缩、链接 14px / 行高 2.2857143、当前项取 `--vp-c-text-1`，另带图样相同的 2px `.outline-marker`。
 
 当前项由宿主做滚动同步：给链接加 `.active`（或 `aria-current="location"`），并把 `.outline-marker` 的 `top`、`opacity` 设到对应位置；demo 实现见 `index.html` 的内联脚本。
 
@@ -593,7 +593,7 @@ const { html, lang, ok } = highlightBlock(code, 'ts', { meta: '{2,4-5}' });
 npm install          # 安装依赖
 npm run build        # dist/index.js、dist/index.min.js、两份 CSS，外加 Vite 构建的自包含 demo（index.html + assets、public/、demo.md）
 npm run dev          # Vite 开发服务（根目录 index.html，引用 src 源码，改源码即时生效）
-npm run demo         # build + vite preview（http://127.0.0.1:4180），跑 dist 构建产物
+npm run build && npm run preview    # 构建后预览 dist（http://127.0.0.1:4180）
 npm test             # 运行 node:test 测试
 npm run lint         # eslint 检查（--max-warnings 0）
 npm run lint:fix     # eslint 自动修复

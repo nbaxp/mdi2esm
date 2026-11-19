@@ -45,10 +45,11 @@ export function applyRestoreEntities(md) {
 
 // 官方 table.ts：横向溢出的表格可被键盘聚焦并滚动
 export function applyTablePlugin(md) {
-  const tableOpen = md.renderer.rules.table_open;
+  const tableOpen =
+    md.renderer.rules.table_open ?? ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options));
   md.renderer.rules.table_open = (tokens, idx, options, env, self) => {
     if (tokens[idx].attrIndex('tabindex') < 0) tokens[idx].attrSet('tabindex', '0');
-    return tableOpen ? tableOpen(tokens, idx, options, env, self) : self.renderToken(tokens, idx, options);
+    return tableOpen(tokens, idx, options, env, self);
   };
 }
 

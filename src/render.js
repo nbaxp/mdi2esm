@@ -32,7 +32,6 @@ const REBASE_RE = /^[ \t]*<!-- @include-(?:start: (.*)|end) -->[ \t]*$/gm;
 // URL 拼装与锚点形态交给 config.adapters，渲染层不含任何宿主路径规则
 md.core.ruler.push('link_rewrite', (state) => {
   const adapters = state.env.adapters ?? DEFAULT_ADAPTERS;
-  const config = state.env.config;
   const pageDir = state.env.dir ?? '';
   const stack = [];
   let dir = pageDir;
@@ -79,7 +78,7 @@ md.core.ruler.push('link_rewrite', (state) => {
         if (href.startsWith('/')) continue;
         const [path, rawHash] = href.split('#');
         const hash = rawHash ? normalizeHash(rawHash) : '';
-        child.attrSet('href', adapters.toHref({ href, path, resolved: resolvePath(dir, path), hash, dir, config }));
+        child.attrSet('href', adapters.toHref({ path, resolved: resolvePath(dir, path), hash }));
       } else if (child.type === 'image') {
         let src = child.attrGet('src') ?? '';
         // 运行时解析图片尺寸语法 =WxH（对齐 VitePress image.ts，不依赖 Node 探测）
@@ -93,7 +92,7 @@ md.core.ruler.push('link_rewrite', (state) => {
         }
         if (/^(https?:|mailto:|#|data:)/i.test(src)) continue;
         const resolved = src.startsWith('/') ? src : resolvePath(dir, src);
-        child.attrSet('src', adapters.toSrc({ src, resolved, dir, config }));
+        child.attrSet('src', adapters.toSrc({ src, resolved }));
         child.attrSet('loading', 'lazy');
       }
     }
@@ -104,7 +103,7 @@ md.core.ruler.push('link_rewrite', (state) => {
 // 无空格的 `=WxH` 才能被解析；尺寸在链接重写规则的 image 分支运行时提取
 const IMAGE_SIZE_PRE = /(\]\([^\s)]*?) =([0-9]*x?[0-9]*)\)/g;
 
-// 收集 h2/h3 并组装为「本页目录」树（与 mdoc markdown-render.js 一致）
+// 收集 h2–h6 并组装为「本页目录」树（与 mdoc markdown-render.js 一致）
 export function buildOutline(headings) {
   const root = [];
   const stack = [];

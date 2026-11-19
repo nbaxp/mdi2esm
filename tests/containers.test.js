@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { renderMarkdown } from '../src/index.js';
-import { render } from '../src/markdown-it.js';
+import md from '../src/markdown-it.js';
 
 test('tip 容器渲染为 custom-block 且带默认标题（zh）', async () => {
   const { html } = await renderMarkdown('::: tip\n内容\n:::');
@@ -43,7 +43,7 @@ test('容器：tip/info/warning/danger 输出 custom-block 与默认标题', () 
     ['danger', '危险'],
   ];
   for (const [name, label] of cases) {
-    const html = render(`::: ${name}\n内容\n:::`, {});
+    const html = md.render(`::: ${name}\n内容\n:::`, {});
     assert.match(
       html,
       new RegExp(
@@ -56,7 +56,7 @@ test('容器：tip/info/warning/danger 输出 custom-block 与默认标题', () 
 });
 
 test('容器：details 输出 details/summary 且 {open} 透传', () => {
-  const html = render('::: details {open}\n内容\n:::', {});
+  const html = md.render('::: details {open}\n内容\n:::', {});
   assert.equal(
     html,
     '<details class="details custom-block" open="open"><summary>详细信息</summary>\n<p>内容</p>\n</details>\n',
@@ -64,6 +64,6 @@ test('容器：details 输出 details/summary 且 {open} 透传', () => {
 });
 
 test('容器：自定义标题替换默认文案，{no-title} 不输出标题', () => {
-  assert.match(render('::: warning 自定义标题\n内容\n:::', {}), /<p class="custom-block-title">自定义标题<\/p>/);
-  assert.equal(render('::: tip {no-title}\n内容\n:::', {}).includes('custom-block-title'), false);
+  assert.match(md.render('::: warning 自定义标题\n内容\n:::', {}), /<p class="custom-block-title">自定义标题<\/p>/);
+  assert.equal(md.render('::: tip {no-title}\n内容\n:::', {}).includes('custom-block-title'), false);
 });

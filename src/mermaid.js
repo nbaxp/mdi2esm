@@ -3,21 +3,18 @@
 // SVG 只能经 innerHTML 写进真实 DOM——Vue 模板编译会丢掉 SVG 内嵌的 <style>。
 import { h, onMounted, onUnmounted, shallowRef, watch } from 'vue';
 
-let mermaidPromise;
-let pelePromise;
+import { lazyModule } from './lazy-module.js';
+
 let mermaidCount = 0;
 
-const loadMermaid = () =>
-  (mermaidPromise ??= import('mermaid').catch((err) => {
-    console.warn('[mdi2esm] Mermaid 模块加载失败：', err);
-    return null;
-  }));
-
-const loadPele = () =>
-  (pelePromise ??= import('pele').catch((err) => {
-    console.warn('[mdi2esm] Pele 模块加载失败：', err);
-    return null;
-  }));
+const loadMermaid = lazyModule(
+  () => import('mermaid'),
+  (err) => console.warn('[mdi2esm] Mermaid 模块加载失败：', err),
+);
+const loadPele = lazyModule(
+  () => import('pele'),
+  (err) => console.warn('[mdi2esm] Pele 模块加载失败：', err),
+);
 
 const isDark = () => document.documentElement.classList.contains('dark');
 

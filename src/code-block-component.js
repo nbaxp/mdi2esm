@@ -1,8 +1,8 @@
 // 独立代码块：给宿主组件用的同步高亮 API。
 // 与 markdown fence 共用 Prism 语法与行切分，输出不含复制按钮（交互由宿主决定）。
 import { wrapLines } from './code-lines.js';
-import { highlightCode, normalizeLang } from './highlight.js';
 import { escapeHtml } from './markdown-plugins.js';
+import { highlightCode, normalizeLang } from './prism.js';
 
 // 语言名只允许字母数字与 - _ + # .，避免拼进 class 属性时被注入
 const sanitizeLang = (name) => String(name ?? '').replace(/[^\w+#.-]/g, '');

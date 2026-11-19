@@ -1,21 +1,24 @@
 const BOM = '\uFEFF';
+const START_RE = /^---[ \t]*\r?$/;
+const END_RE = /^(?:---|\.\.\.)[ \t]*\r?$/;
+
+const stripBom = (raw) => (raw.startsWith(BOM) ? raw.slice(1) : raw);
+
+// 结束行序号；首行无效或找不到结束行时返回 -1
+function frontmatterEnd(lines) {
+  if (!START_RE.test(lines[0])) return -1;
+  for (let i = 1; i < lines.length; i += 1) {
+    if (END_RE.test(lines[i])) return i;
+  }
+  return -1;
+}
 
 // 只剥离文件顶部结构有效的 frontmatter：不解析 YAML、不做语义校验、不改动正文
 export const stripFrontmatter = (raw) => {
-  const source = raw.startsWith(BOM) ? raw.slice(1) : raw;
+  const source = stripBom(raw);
   const lines = source.split('\n');
-
-  // 首行必须是顶格 `---`（允许行尾空白与 CR）；前面有空行或空格都不算
-  if (!/^---[ \t]*\r?$/.test(lines[0])) return source;
-
-  // 结束行必须是顶格 `---` 或 `...`（YAML 文档结束符）；找不到则不剥离
-  for (let i = 1; i < lines.length; i += 1) {
-    if (/^(?:---|\.\.\.)[ \t]*\r?$/.test(lines[i])) {
-      return lines.slice(i + 1).join('\n');
-    }
-  }
-
-  return source;
+  const end = frontmatterEnd(lines);
+  return end < 0 ? source : lines.slice(end + 1).join('\n');
 };
 
 const unquote = (value) => {
@@ -126,20 +129,11 @@ const parseBlock = (lines, startIndex, indent) => {
  * @returns {{ body: string, data: object }}
  */
 export function parseFrontmatter(raw) {
-  const source = raw.startsWith(BOM) ? raw.slice(1) : raw;
+  const source = stripBom(raw);
   const lines = source.split('\n');
-  const body = stripFrontmatter(source);
-
-  if (!/^---[ \t]*\r?$/.test(lines[0])) return { body: source, data: {} };
-
-  let end = -1;
-  for (let i = 1; i < lines.length; i += 1) {
-    if (/^(?:---|\.\.\.)[ \t]*\r?$/.test(lines[i])) {
-      end = i;
-      break;
-    }
-  }
-  if (end < 0) return { body: source, data: {} };
+  const end = frontmatterEnd(lines);
+  const body = end < 0 ? source : lines.slice(end + 1).join('\n');
+  if (end < 0) return { body, data: {} };
 
   const block = lines.slice(1, end).map((line) => line.replace(/\r$/, ''));
   try {
