@@ -3,6 +3,7 @@
 import { compile, defineComponent, markRaw } from 'vue';
 import { styleMixin } from 'vue-style-runtime';
 
+import { assertConfigCompatible } from './config.js';
 import { parseFrontmatter } from './frontmatter.js';
 import { mountImageZoom } from './image-zoom.js';
 import { ensureEmojiPlugin } from './markdown-it.js';
@@ -13,7 +14,7 @@ import { escapeInvalidInterpolations, renderMarkdown } from './render.js';
 // 剥离第一个顶级的 <script>（页面级脚本，围栏内的不动），style 块全部剥离经 styleMixin 注入组件。
 // 页面级脚本只会有一个：其后正文里出现的 <script> 属于文档内容，原样保留不剥离。
 // <script setup> 拼成 ESM 模块执行（见 ./markdown-script.js），普通 <script> 默认导出并入组件选项。
-export function extractTopLevelBlocks(raw) {
+export function extractTopLevelBlocks(raw, { extractScripts = true } = {}) {
   const lines = raw.split(/\r?\n/);
   const body = [];
   const scripts = [];
@@ -43,7 +44,7 @@ export function extractTopLevelBlocks(raw) {
       continue;
     }
     // 只认第一个 <script>：其后正文里的 <script> 是文档内容，不剥离
-    const script = scripts.length === 0 && /^<script([^>]*)>/.exec(line);
+    const script = extractScripts && scripts.length === 0 && /^<script([^>]*)>/.exec(line);
     if (script) {
       const block = readBlock(i, /^<\/script>/);
       scripts.push({ attrs: script[1], content: block.content });
@@ -88,11 +89,15 @@ function mergeScriptOptions(options, def) {
  * @returns {Promise<object|null>} 组件定义；空正文返回 null
  */
 export async function createMarkdownComponent(source, dir, config, { frontmatter, params } = {}) {
+  assertConfigCompatible(config);
   // frontmatter：宿主显式传入优先，否则用（可替换的）内置子集解析器
   const parse = config?.markdown?.frontmatterParser ?? parseFrontmatter;
   const parsed = parse(source);
   const data = frontmatter ?? parsed.data;
-  const { body, scripts, styles } = extractTopLevelBlocks(parsed.body);
+  // markdown.scripts === false：不提取也不执行 <script>（严格模式），第一个 <script> 留在正文
+  const { body, scripts, styles } = extractTopLevelBlocks(parsed.body, {
+    extractScripts: config?.markdown?.scripts !== false,
+  });
   // markdown-it-emoji 不内置：装了就挂上（幂等），没装静默跳过，渲染结果不受影响
   if (!body.trim()) return { component: null, headings: [] };
   await ensureEmojiPlugin();

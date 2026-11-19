@@ -2,6 +2,8 @@
 
 本文档与代码同步，说明 mdi2esm 要解决的问题、设计取舍与当前实现。面向需要改源码或评估接入门槛的读者；接入用法见 [README.md](./README.md)。
 
+> 版本 1.0.0。文档与代码同步维护；若不一致，以代码为准并修订本文。
+
 ## 1. 要解决的问题
 
 宿主是一个浏览器里的文档站（典型是 mdoc 这类 SPA：vue-router + 原生 ESM + importmap），需要在运行时把一份 Markdown 文本变成可交互页面。难点不在 Markdown 语法本身，而在下面这些宿主相关约束：
@@ -68,10 +70,13 @@ URL 的**拼装规则**交给 `config.adapters` 的四个函数（`src/config.js
 
 关键约束：**`base` 不作为字段出现在 config 上**，而是"编译"进 adapters——避免 `<base>`、config、适配器之间出现多个真相来源。默认实现只表达通用形态（`.md` 剥除），路由语义由宿主覆写决定。
 
+adapters 只接收路径/上下文字段（见上表），不接收每次渲染的 `env`；若宿主规则依赖 frontmatter 或路由状态，在覆写函数内用闭包捕获（或从 `scriptContext` 取 frontmatter/params）。
+
 ### 2.5 脚本：`<script setup>` 与 `<script>`
 
 浏览器没有打包器，所以脚本模块必须自己拼成可执行的 ESM（`src/markdown-script.js`）：
 
+- **只支持一个顶层 `<script>`**：`<script setup>` 与普通 `<script>` 互斥（看第一个是哪种），不能并存；第二个及以后的 `<script>` 视为正文内容（`html: true` 下作为原始 HTML 输出，浏览器不执行 `<script>` 标签）。
 - **`<script setup>`**：`hoistImports` 把 `import` 提到模块顶层，相对说明符经 `toScriptImport` 变成**绝对 URL**（Blob URL 无相对基准，这是硬约束）；随后拼出 `export function setup() { ... return { bindings } }`，用 `URL.createObjectURL(new Blob([source]))` 动态 `import()`，取出 `setup` 作为组件的 `setup`。
 - **普通 `<script>`**：默认导出（选项对象）并入组件选项，`mounted` 与管线 mounted 链式合并；`render/template` 视为 markdown 正文忽略。
 - **数据注入**：`frontmatter` 挂到实例（`beforeCreate` 设 `$frontmatter`），并经 `scriptContext` 注入 setup 作用域；`params` 仅经 `scriptContext` 注入 setup 闭包常量，不作为组件 props 暴露（见 §3.6）。
@@ -82,7 +87,7 @@ URL 的**拼装规则**交给 `config.adapters` 的四个函数（`src/config.js
 - **内联进产物**：Prism 核心 + 常用语言（构建期打包），`highlightCode` 同步高亮，宿主无需安装。
 - **运行时按需**：KaTeX、Mermaid/Pele、medium-zoom 都走 `src/lazy-module.js` 的 `lazyModule(importFn, onFail)`——promise 缓存 + 失败回 `null`，由调用方降级（公式按原始文本、图片不放大、图表留占位）。
 - **不内置**：markdown-it-emoji（可选 peer，装了才启用，`ensureEmojiPlugin` 幂等）、Iconify 图标（由宿主注入 `Icon` 组件）。
-- **样式**：`src/styles/doc.css` 必带（结构 + 容器 + 大纲 + 代码）；`prism.css` 独立（主题可换）；KaTeX 的 CSS 由宿主自己 import，库不注入 `<link>`。
+- **样式**：只有 `src/styles/index.css`（`@import` vars/icons/doc）必带，构建为 `dist/index.css`；**无独立 `prism.css`**——Prism token 配色在 `doc.css`，换主题覆盖 `--vp-*` / `.dark` / `.token` 规则；KaTeX 的 CSS 由宿主自己 import，库不注入 `<link>`。
 
 ### 2.7 组件边界
 
@@ -93,6 +98,14 @@ URL 的**拼装规则**交给 `config.adapters` 的四个函数（`src/config.js
 - `markRaw` 包裹组件，避免 Vue 对编译产物做响应式代理；
 - 图片缩放在**组件根节点内**查找（`mountImageZoom(this.$el)`），多份 md 同页互不干扰，不依赖全局 `.vp-doc` 选择器。
 - Mermaid 的 `pele` 驱动配色由组件内联 `--pele-*`（从 `--vp-*` 派生），不依赖包内 CSS 是否被引入；`mermaid` 驱动在挂载时按 `html.dark` 选主题，并在 `.dark` 切换时重绘。
+
+### 2.8 安全与 CSP
+
+- **Markdown 源按可信内容对待**：不做 HTML 净化。`<script>` / `<script setup>` 会执行作者代码（等同 XSS 面），只应在可信源（自有文档）下启用；不可信源设 `config.markdown.scripts = false`（不提取也不执行），或在宿主侧前置剥离。
+- **Vue 运行时编译**：`createMarkdownComponent` 用 `compile()` 把 md 编成模板，需要 `unsafe-eval`；严格 CSP（无 `unsafe-eval`）下编译失败。要嵌入严格 CSP 页面需宿主预编译或自行处理。
+- **Blob URL 动态 import**：`<script>` 模块经 `blob:` URL 执行，需 `script-src blob:`（或等价允许）；受限时脚本降级为无脚本渲染（`console.warn`）。
+- **插值检测**：`escapeInvalidInterpolations` 用 `new Function` 判断表达式合法性，`unsafe-eval` 受限时把合法插值也转义为字面量（不影响安全，影响交互）。
+- **裸 HTML**：markdown-it `html: true`，Markdown 里的裸 HTML 会渲染，库不做净化；宿主若担心注入，应在源侧保证可信或自行过滤。
 
 ## 3. 当前实现
 
@@ -122,16 +135,18 @@ URL 的**拼装规则**交给 `config.adapters` 的四个函数（`src/config.js
 
 ### 3.2 公共 API
 
-包入口只有六个导出（`src/index.js`；完整用法与示例见 README）：
+包入口共八个导出（`src/index.js`；完整用法与示例见 README）：
 
 - `createConfig({ base, adapters, locale, labels, markdown, mermaidDriver, ... })`
-- `renderMarkdown(body, { dir, config })` → `{ html, headings }`
-- `createMarkdownComponent(source, dir, config, { frontmatter, params })` → `{ component, headings }`
+- `renderMarkdown(body, { dir, config })` → `{ html, headings }`（**不等待 emoji 挂载**，首次渲染可能尚未启用 emoji；需确保就绪先 `await ensureMarkdownReady()`）
+- `createMarkdownComponent(source, dir, config, { frontmatter, params })` → `{ component, headings }`（渲染前会 `await ensureMarkdownReady()`）
 - `buildOutline(headings)` → 目录树
 - `highlightBlock(props)` → 独立代码块组件
+- `ensureMarkdownReady()` → `Promise<void>`（挂载可选的 markdown-it-emoji，幂等）
+- `assertConfigCompatible(config)` → 单例配置冲突告警（首次记录指纹，后续不同则 `console.warn`）
 - `md` → markdown-it 实例（供特殊扩展，一般不用）
 
-内部步骤（`resolvePath`、`maskFenceMarkers`、`renderMath`、`escapeInvalidInterpolations` 等）不视为稳定 API。
+内部步骤（`resolvePath`、`maskFenceMarkers`、`renderMath`、`escapeInvalidInterpolations`、`extractTopLevelBlocks` 等）不视为稳定 API。公共 API 带 JSDoc，未发布 `.d.ts`。
 
 ### 3.3 关键流程（代码位置）
 
@@ -152,19 +167,26 @@ URL 的**拼装规则**交给 `config.adapters` 的四个函数（`src/config.js
 - `npm run build`：产出 `dist/index.js`、`dist/index.min.js`、两份 CSS，外加 Vite 构建的根 demo（自包含）。
 - `package.json` 的 `exports`：`.`（`development` → `dist/index.js`，默认 → `dist/index.min.js`）、`./index`、`./index.min`、`./index.css`、`./index.min.css`、`./package.json`。
 - **dependencies**：markdown-it 栈（`markdown-it` / `@mdit/*` / `@mdit-vue/*` / `markdown-it-cjk-friendly`）与 `prismjs`（构建期内联进产物）；**peerDependencies**：`vue`、`vue-style-runtime`（宿主提供，产物静态导入）；可选 peer：markdown-it-emoji、katex、mermaid、pele、medium-zoom、@iconify/vue（依赖清单与脚本见 README）。
+- **浏览器基线**：原生 ESM、动态 `import()`、Blob URL / `URL.createObjectURL`、importmap（可选）、CSS 自定义属性；宿主 Vue 必须是**含模板编译器**的构建（`compile` 需要）。
+- **体积**（v1.0.0，内联 Prism 核心 + 常用语言与 markdown-it 栈）：`dist/index.js` ≈ 443 KB、`dist/index.min.js` ≈ 303 KB、`dist/index.css` ≈ 37 KB；重依赖（KaTeX / Mermaid / Pele / medium-zoom）不内联，按需动态加载。
 
 ### 3.6 已知边界（实现现状）
 
-- **单例限制**：`md` 是模块级单例，`mark/sub/sup` 开关首渲染后锁定，emoji 挂载只一次（异步）；自定义容器则跨 config 累积注册。同一进程内不能同时服务两套不同配置。
+- **单例限制（架构约束）**：`md` 是模块级单例，**一个进程只服务一套配置**。`mark/sub/sup` 开关首渲染后锁定，emoji 挂载只一次（异步）；自定义容器跨 config 累积注册（同名以先注册者为准，后注册被忽略）。`assertConfigCompatible(config)` 在 `renderMarkdown` / `createMarkdownComponent` 首次记录行为指纹（locale / markdown 开关 / mermaidDriver / 容器等，不含 adapters 函数引用），后续切到不同配置时 `console.warn` 且仅首份生效。宿主 SPA 多实例、测试隔离、热更新、多站点复用都受此限制；中期方向是 `createMarkdownRenderer(config)` 工厂（每实例独立 md），当前未实现。
 - **无 SSR**：渲染在浏览器完成，产物是客户端组件。
-- **顶层脚本只认第一个**：`<script>` 只提取第一处，其后正文中的 `<script>` 视为文档内容。
+- **只支持一个顶层 `<script>`**：`<script setup>` 与普通 `<script>` 互斥，不能并存；第二个及以后的 `<script>` 留在正文（`html: true` 下作为原始 HTML 输出，不执行）。
 - **默认路由语义有限**：`createBaseAdapters` 只剥 `.md`、不归一化 `index`；路由规则由宿主覆写（见 README 的 mdoc 示例）。
 - **`<base>` 不参与**：路径前缀由 `adapters` 显式计算，不依赖文档 `<base>`（`<base>` 无法覆盖相对解析与 script 绝对化，见 README 部署路径章节）。
-- **脚本 import 用正则解析**：`hoistImports` 以 `IMPORT_RE` 提取 `import ... from '...'`，不覆盖注释/字符串内的伪 import、动态 `import()` 与多行写法。
+- **脚本 import 用正则解析**（`IMPORT_RE`，仅行首单行）：
+  - 支持：`import default / { named } / * as ns from 'spec'`、side-effect `import 'spec'`；
+  - 不支持：多行 import、`import type`（会被当普通子句原样保留，浏览器下报语法错）、动态 `import()`、`import.meta`（Blob 模块中 `import.meta.url` 指向 Blob URL）；
+  - 注释/字符串里同形文本可能被误提取；复杂脚本应由宿主预处理器处理。
 - **仅 import 的普通 `<script>` 会保留**：`buildScriptModuleSource` 在只有 import、没有其它语句时也产出模块，避免副作用 import 丢失。
 - **插值检测受 CSP 影响**：`escapeInvalidInterpolations` 用 `new Function` 判断表达式合法性，`unsafe-eval` 受限时会把合法插值也转义成字面量。
-- **重写只覆盖 markdown 语法**：raw HTML 里的 `<a>` / `<img>` 不参与 `link_rewrite`。
-- **`params` 不是组件 props**：只注入 `<script setup>` 作用域（`const params = ...`），模板要直接用需经 setup 返回。
+- **重写只覆盖 markdown 语法**：`html: true` 下裸 HTML 会渲染，但其中的 `<a>` / `<img>` 不参与 `link_rewrite`——子路径/嵌套部署时裸 HTML 里的相对链接不会加 `base` 前缀，需宿主改写或避免使用（见 README 部署路径章节）。
+- **`params` 不是组件 props**：只注入 `<script setup>` 作用域（`const params = ...`），模板要直接用需经 setup 返回；`params` / `frontmatter` 在组件创建时注入，之后变化不会更新，宿主需重建组件。
+- **heading id 无命名空间**：anchor 的 slug 由标题文本生成，多份 md 同页可能出现重复锚点；库不做前缀/命名空间（`md` 单例，slugify 全局固定）。
+- **错误边界**：frontmatter 解析失败按无 frontmatter 处理；`md.render` 异常向上抛（宿主可捕获）；`<script>` 解析/执行失败降级为无脚本渲染（warn）；KaTeX / Mermaid / medium-zoom 加载失败分别按原始文本 / 源码占位 / 不放大降级。
 
 ## 4. 与宿主（mdoc）的集成要点
 

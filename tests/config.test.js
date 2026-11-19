@@ -26,6 +26,7 @@ test('配置：schema 与默认预设', () => {
     sub: true,
     sup: true,
     container: [],
+    scripts: true,
     frontmatterParser: null,
   });
 });
@@ -41,6 +42,7 @@ test('配置：createConfig 合并覆盖并按 locale 选文案', () => {
     sub: true,
     sup: true,
     container: [],
+    scripts: true,
     frontmatterParser: null,
   });
   const custom = createConfig({ adapters: { toSrc: ({ src }) => `/x/${src}` } });

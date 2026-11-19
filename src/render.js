@@ -1,7 +1,7 @@
 // Markdown 渲染管线：共享 markdown-it 实例 + 通用链接重写。
 // URL 拼装与锚点形态由 config.adapters 提供，标题锚点由 markdown-it.js 里的官方 anchor 插件生成
 import { maskFenceMarkers, unmaskFenceMarkers } from './code-block.js';
-import { createRenderEnv, DEFAULT_ADAPTERS } from './config.js';
+import { assertConfigCompatible, createRenderEnv, DEFAULT_ADAPTERS } from './config.js';
 import md, { ensureCustomContainers, ensureSyntaxPlugins } from './markdown-it.js';
 import { normalizeHash } from './markdown-plugins.js';
 import { renderMath } from './math.js';
@@ -121,6 +121,7 @@ export function buildOutline(headings) {
 // 围栏保护与 KaTeX 渲染都在内部完成，调用方拿到的就是可挂载的最终 HTML，
 // 不需要也不应该自己再拼 mask / renderMath 这两步。
 export async function renderMarkdown(body, { dir = '', config } = {}) {
+  assertConfigCompatible(config);
   const env = createRenderEnv(config, { dir });
   ensureCustomContainers(env.config);
   ensureSyntaxPlugins(env.config);

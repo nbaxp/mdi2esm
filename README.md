@@ -180,6 +180,8 @@ createConfig({
 
 KaTeX 的样式不属于路径配置，库也不注入 `<link>`：`katex/dist/katex.min.css` 由宿主自己引入（见上一节）。
 
+**裸 HTML 不参与路径改写**：Markdown 里的裸 HTML（`html: true` 会渲染）中的 `<a>` / `<img>` 不经过 `link_rewrite`，子路径/嵌套部署时其中的相对链接不会加 `base` 前缀。请在 Markdown 中用链接/图片语法，或自行改写裸 HTML。
+
 ## 样式
 
 渲染产物的类名沿用 VitePress 风格（`.vp-doc`、`.custom-block` 等）。包内附带一套只覆盖 markdown 正文与页内目录（`.vp-doc`、`.vp-doc-outline`）的样式：
@@ -515,6 +517,15 @@ export default {
 }
 </script>
 
+**只支持一个顶层 `<script>`**：`<script setup>` 与普通 `<script>` 互斥，不能并存；第二个及以后的 `<script>` 会留在正文（作为原始 HTML 输出，不执行）。
+
+脚本能力的安全与限制：
+
+- **只应在可信源启用**：`<script>` / `<script setup>` 会执行作者代码；不可信内容请设 `createConfig({ markdown: { scripts: false } })`（不提取也不执行），或宿主前置剥离。
+- **CSP**：脚本模块经 `blob:` URL 动态 `import()` 执行，需要 `script-src blob:`；`createMarkdownComponent` 的运行时模板编译与插值检测需要 `unsafe-eval`，严格 CSP 下会失败/降级。
+- **import 支持**：仅行首单行 `import ... from '...'` 与 side-effect `import '...'`；多行 import、`import type`、动态 `import()`、`import.meta` 不被改写（相对说明符在 Blob 模块中会失败）。复杂脚本建议宿主预处理器处理。
+- **params 非响应式**：`params` / `frontmatter` 在组件创建时注入，之后变化不会更新，需要重建组件。
+
 ## 语法糖与 frontmatter
 
 三条常用内联语法默认开启，可在 `config.markdown` 里关掉：
@@ -578,14 +589,15 @@ const { html, lang, ok } = highlightBlock(code, 'ts', { meta: '{2,4-5}' });
 
 ## 公共 API
 
-包入口只有六个导出：
+包入口共八个导出：
 
-- 配置：`createConfig`
+- 配置：`createConfig`、`assertConfigCompatible`（单例配置冲突告警）
 - 渲染：`renderMarkdown`（markdown → HTML，KaTeX 已内部渲染）、`createMarkdownComponent`（markdown → Vue 组件）、`buildOutline`
 - 代码块：`highlightBlock`
+- 就绪：`ensureMarkdownReady`（挂载可选 emoji，幂等）
 - 底层：`md`（共享的 markdown-it 实例，需要自己 `parse` token 时用）
 
-`renderMarkdown(source, { dir, config })` 异步返回 `{ html, headings }`；`createMarkdownComponent` 返回 `{ component, headings }`；`buildOutline(headings)` 生成树形大纲。`renderMath`、`maskFenceMarkers` 这类内部步骤不再导出。
+`renderMarkdown(source, { dir, config })` 异步返回 `{ html, headings }`，**不等待 emoji 挂载**（首次渲染可能未启用 emoji，需要就绪先 `await ensureMarkdownReady()`）；`createMarkdownComponent` 会先等待 emoji 就绪。**单配置进程**：`md` 是模块级单例，一个进程只服务一套配置；切换会影响渲染的配置时 `assertConfigCompatible` 会 `console.warn`，且仅首份配置生效。
 
 ## 开发
 

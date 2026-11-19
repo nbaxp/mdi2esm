@@ -44,6 +44,7 @@ export const DEFAULT_CONFIG = {
     sub: true,
     sup: true,
     container: [],
+    scripts: true,
     frontmatterParser: null,
   },
 };
@@ -114,4 +115,35 @@ export function createRenderEnv(config = createConfig(), page = {}) {
     copyLabels: config.labels.copy,
     headings: [],
   };
+}
+
+// 单例约束的行为指纹：只比对影响装配/渲染结果的原始字段，不比对 adapters 函数引用
+function configFingerprint(config) {
+  const md = config?.markdown ?? {};
+  return JSON.stringify({
+    locale: config?.locale,
+    mermaidDriver: config?.mermaidDriver,
+    lineNumbers: md.lineNumbers,
+    math: md.math,
+    mark: md.mark,
+    sub: md.sub,
+    sup: md.sup,
+    scripts: md.scripts,
+    container: md.container ?? [],
+    frontmatterParser: Boolean(md.frontmatterParser),
+  });
+}
+
+let seenFingerprint = null;
+
+// md 是模块级单例：同一进程内切换会影响渲染的配置时告警（仅首份配置生效）
+export function assertConfigCompatible(config = createConfig()) {
+  const fp = configFingerprint(config);
+  if (seenFingerprint === null) {
+    seenFingerprint = fp;
+  } else if (seenFingerprint !== fp) {
+    console.warn(
+      '[mdi2esm] 单例限制：同一进程内切换了影响渲染的配置（locale / markdown 开关 / mermaidDriver / 容器等），仅首份配置生效；请保持配置一致或每进程单配置。',
+    );
+  }
 }
