@@ -46,6 +46,8 @@ export const DEFAULT_CONFIG = {
     container: [],
     scripts: true,
     frontmatterParser: null,
+    // [[toc]]：level 目录层级、showAutoNumber 标题/目录自动编号、allowMultiToc 允许多个目录
+    toc: { level: [2, 3], showAutoNumber: false, allowMultiToc: true },
   },
 };
 
@@ -95,7 +97,11 @@ export function createConfig({ base = '/', adapters, ...overrides } = {}) {
     ...DEFAULT_CONFIG,
     ...overrides,
     locale,
-    markdown: { ...DEFAULT_CONFIG.markdown, ...overrides.markdown },
+    markdown: {
+      ...DEFAULT_CONFIG.markdown,
+      ...overrides.markdown,
+      toc: { ...DEFAULT_CONFIG.markdown.toc, ...overrides.markdown?.toc },
+    },
     labels: {
       container: overrides.labels?.container ?? CONTAINER_LABELS[key],
       copy: overrides.labels?.copy ?? COPY_LABELS[key],
@@ -131,6 +137,9 @@ function configFingerprint(config) {
     scripts: md.scripts,
     container: md.container ?? [],
     frontmatterParser: Boolean(md.frontmatterParser),
+    tocLevel: md.toc?.level,
+    tocShowAutoNumber: md.toc?.showAutoNumber,
+    tocAllowMultiToc: md.toc?.allowMultiToc,
   });
 }
 

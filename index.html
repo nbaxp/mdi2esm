@@ -18,17 +18,23 @@
     <style>
       /* demo 外壳专用样式（demo- 前缀，避免与 mdi2esm 的 .vp-doc 样式冲突）。
          markdown 正文与页内目录的样式来自库的 index.css，这里只负责页面骨架。 */
+      /* 页面骨架：标准 header / content / footer 三行 flex。高度取视口（不写死 px），
+         中间 flex:1 + min-height:0，三列在 main 内部各自全高滚动，页面本身不滚动。 */
       body {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        margin: 0;
+        overflow: hidden;
         background: var(--vp-c-bg);
         color: var(--vp-c-text-1);
         font-family: var(--vp-font-family-base);
       }
 
       .demo-header {
-        position: sticky;
-        top: 0;
-        z-index: 10;
+        flex: none;
         display: flex;
+        flex-wrap: wrap;
         gap: 12px;
         align-items: center;
         padding: 12px 20px;
@@ -36,17 +42,24 @@
         background: var(--vp-c-bg);
       }
 
+      .demo-footer {
+        flex: none;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 20px;
+        border-top: 1px solid var(--vp-c-divider);
+        color: var(--vp-c-text-2);
+        font-size: 12px;
+      }
+
       .demo-header strong {
         font-size: 16px;
       }
 
-      .demo-header span {
-        color: var(--vp-c-text-2);
-        font-size: 13px;
-      }
-
       .demo-header button,
-      .demo-driver select {
+      .demo-header select {
         border: 1px solid var(--vp-c-divider);
         background: var(--vp-c-bg-soft);
         color: var(--vp-c-text-1);
@@ -64,15 +77,45 @@
         font-size: 13px;
       }
 
+      .demo-header label.demo-toc {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--vp-c-text-2);
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      .demo-header label.demo-toc select {
+        padding: 3px 6px;
+      }
+
       .demo-main {
+        flex: 1;
+        min-height: 0;
         display: grid;
-        grid-template-columns: 1fr 1fr 220px;
+        /* minmax(0, 1fr)：避免长代码块等内容的 min-content 把中列撑大、挤压左列 */
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 220px;
         gap: 16px;
         padding: 16px 20px;
-        align-items: start;
+      }
+
+      .demo-main > section {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        /* flex/grid 子项默认 min-width:auto，会被长代码块等 min-content 撑宽整列 */
+        min-width: 0;
+      }
+
+      .demo-aside {
+        min-height: 0;
+        min-width: 0;
+        overflow: hidden;
       }
 
       .demo-col-title {
+        flex: none;
         margin: 0 0 6px;
         color: var(--vp-c-text-2);
         font-size: 12px;
@@ -82,8 +125,10 @@
 
       .demo-src {
         box-sizing: border-box;
+        flex: 1;
+        min-height: 0;
+        min-width: 0;
         width: 100%;
-        height: 78vh;
         padding: 12px;
         border: 1px solid var(--vp-c-divider);
         border-radius: 8px;
@@ -93,11 +138,13 @@
         font-size: 12px;
         line-height: 1.6;
         tab-size: 2;
-        resize: vertical;
+        resize: none;
       }
 
       .demo-rendered {
-        height: 78vh;
+        flex: 1;
+        min-height: 0;
+        min-width: 0;
         overflow: auto;
         border: 1px solid var(--vp-c-divider);
         border-radius: 8px;
@@ -105,9 +152,27 @@
         color: var(--vp-c-text-1);
       }
 
+      /* 库样式 .vp-doc 带 max-width:48rem 与 margin:0 auto；在 flex 子项里
+         auto 外边距会让宽度按内容收缩，溢出中列。构建后本 style 会被提到
+         link 的库 CSS 之前，单类选择器盖不住同优先级的 .vp-doc，故用双类。 */
+      .demo-rendered.vp-doc {
+        max-width: none;
+        margin: 0;
+      }
+
       /* demo 的滚动容器没有吸顶导航，锚点偏移缩小到视觉舒适值 */
       .demo-rendered [id] {
         scroll-margin-top: 12px;
+      }
+
+      /* 页内大纲：库样式按 VitePress 单栏布局（sticky + 100vh-2rem），
+         demo 是三栏全高布局，大纲改为占满栏高、内部滚动，不再吸顶。
+         用 relative 而非 static：.outline-marker 是 absolute，需要大纲做包含块 */
+      #outline {
+        position: relative;
+        max-height: none;
+        height: 100%;
+        overflow-y: auto;
       }
 
       /* 短码生成的 <Icon> 是 svg：doc.css 里 svg 按块级排（图片语义），
@@ -145,12 +210,28 @@
   <body>
     <header class="demo-header">
       <strong>mdi2esm</strong>
-      <span>全面 demo · Vite dev/preview · 左编辑右预览</span>
       <label class="demo-driver">
         图表驱动
         <select id="diagram-driver">
           <option value="pele" selected>Pele（默认）</option>
           <option value="mermaid">Mermaid</option>
+        </select>
+      </label>
+      <label class="demo-toc">
+        <input type="checkbox" id="toc-number" />
+        目录编号
+      </label>
+      <label class="demo-toc">
+        <input type="checkbox" id="toc-multi" checked />
+        允许多目录
+      </label>
+      <label class="demo-toc">
+        目录层级
+        <select id="toc-level">
+          <option value="2,3" selected>H2–H3（默认）</option>
+          <option value="2,6">H2–H6</option>
+          <option value="1,2">H1–H2</option>
+          <option value="1,6">H1–H6</option>
         </select>
       </label>
       <button id="render">渲染</button>
@@ -165,10 +246,14 @@
         <p class="demo-col-title">渲染结果</p>
         <div id="content" class="demo-rendered vp-doc"></div>
       </section>
-      <aside>
+      <aside class="demo-aside">
         <nav id="outline" class="vp-doc-outline"></nav>
       </aside>
     </main>
+    <footer class="demo-footer">
+      <span>mdi2esm <span id="version"></span></span>
+      <span>VitePress 风格 Markdown 渲染管线 · 左编辑右预览</span>
+    </footer>
 
     <script type="module">
       // ===== demo 全部逻辑（原 demo/vp-badge.js + demo/main.js，内联成单文件页面） =====
@@ -289,6 +374,9 @@
       import { Icon } from '@iconify/vue';
       import { buildOutline, createConfig, createMarkdownComponent } from 'mdi2esm';
       import { createApp, h, nextTick, shallowRef, watch } from 'vue';
+      import pkg from './package.json';
+
+      document.getElementById('version').textContent = `v${pkg.version}`;
 
       // 注入的唯一入口：md 里用到的 <Icon> / <Badge> 全在这里登记，库内一个都不含。
       // Icon 来自 Iconify；VPBadge 是宿主自己写的组件（内联在本文件上方）。
@@ -304,11 +392,28 @@
       const readme = await fetch(import.meta.env.DEV ? './README.md' : './demo.md').then((res) => res.text());
       ta.value = readme;
 
+      // 目录配置：URL 参数驱动。md 是模块级单例，配置在首次渲染时锁定
+      //（assertConfigCompatible 对后续不同配置只 warn 且首份生效），所以改动需重新加载页面
+      const params = new URLSearchParams(location.search);
+      const parseLevels = (value, fallback) => {
+        const parts = String(value ?? '')
+          .split(',')
+          .map((item) => Number(item.trim()))
+          .filter((item) => item >= 1 && item <= 6);
+        return parts.length === 2 ? parts : fallback;
+      };
+      const toc = {
+        level: parseLevels(params.get('tocLevel'), [2, 3]),
+        showAutoNumber: params.get('tocNumber') === '1',
+        allowMultiToc: params.get('tocMulti') !== '0',
+      };
+
       // 自定义容器：由 config 驱动（非纯 Markdown 语法），演示 ::: demo
       const config = createConfig({
         markdown: {
           lineNumbers: false,
           container: [{ type: 'demo', title: '自定义容器' }],
+          toc,
         },
       });
 
@@ -370,6 +475,12 @@
 
         const active = spyLinks[index];
         if (!active) return;
+        // 滚动同步 URL：仅当前项变化时 replaceState（不触发 hashchange，
+        // 不会与点击大纲 / 锚点定位互相触发）
+        const id = active.dataset.target;
+        if (id !== decodeURIComponent(location.hash.slice(1))) {
+          history.replaceState(null, '', id ? `#${id}` : location.pathname + location.search);
+        }
         if (marker) {
           marker.style.top = `${active.offsetTop + (active.offsetHeight - marker.offsetHeight) / 2}px`;
           marker.style.opacity = '1';
@@ -392,6 +503,68 @@
       content.addEventListener('scroll', scheduleActive, { passive: true });
       window.addEventListener('resize', scheduleActive);
 
+      // 正文在 .demo-rendered 独立滚动容器里，浏览器对 #id 的锚点跳转只滚 window，
+      // 预览区不会动。这里统一接管：滚动预览区到目标标题（点击与带锚点刷新共用）。
+      // 懒加载图片在跳转后才加载，高度变化会让目标位置失准；先让正文图片全部就绪，
+      // 再一次性滚动到位（超时兜底，避免个别图片失败导致不跳转）。
+      const scrollToTarget = (id, behavior) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const align = () => {
+          const top = el.getBoundingClientRect().top - content.getBoundingClientRect().top + content.scrollTop - 12;
+          content.scrollTo({ top, behavior });
+        };
+        const imgs = [...content.querySelectorAll('img')];
+        imgs.forEach((img) => {
+          img.loading = 'eager';
+        });
+        const pending = imgs
+          .filter((img) => !img.complete)
+          .map(
+            (img) =>
+              new Promise((resolve) => {
+                img.addEventListener('load', resolve, { once: true });
+                img.addEventListener('error', resolve, { once: true });
+              }),
+          );
+        Promise.race([Promise.all(pending), new Promise((resolve) => setTimeout(resolve, 2000))]).then(() => {
+          align();
+          if (behavior === 'auto') {
+            // 首帧定位时图表/图片等异步内容会让高度继续变化，轮询内容高度、
+            // 连续稳定后按最终高度收尾校正（超时兜底）
+            let lastH = content.scrollHeight;
+            let stable = 0;
+            const timer = setInterval(() => {
+              const h = content.scrollHeight;
+              if (h === lastH) {
+                stable += 1;
+                if (stable >= 3) {
+                  clearInterval(timer);
+                  align();
+                }
+              } else {
+                lastH = h;
+                stable = 0;
+                align();
+              }
+            }, 150);
+            setTimeout(() => {
+              clearInterval(timer);
+              align();
+            }, 4000);
+          }
+        }, align);
+      };
+
+      outline.addEventListener('click', (event) => {
+        const a = event.target.closest('a');
+        if (!a || !a.dataset.target) return;
+        if (!document.getElementById(a.dataset.target)) return;
+        event.preventDefault();
+        history.replaceState(null, '', a.getAttribute('href'));
+        scrollToTarget(a.dataset.target, 'smooth');
+      });
+
       // 编译完得到的 headings：右侧大纲就地重建
       async function onHeadings(headings) {
         outline.innerHTML = '';
@@ -402,7 +575,15 @@
         await nextTick();
         collectOutlineTargets();
         scheduleActive();
+        // 带锚点刷新（如 #时间线）：浏览器只滚 window，这里在首帧按 hash 定位到预览区，
+        // 高亮由滚动事件触发同步；仅处理一次，编辑重编译不会反复跳走
+        if (!initialHashHandled) {
+          initialHashHandled = true;
+          const id = decodeURIComponent(location.hash.slice(1));
+          if (id) scrollToTarget(id, 'auto');
+        }
       }
+      let initialHashHandled = false;
 
       // 文本变了就重编译：按序号丢弃过期结果，编译完再替换视图
       let compileSeq = 0;
@@ -462,6 +643,24 @@
         clearTimeout(inputTimer);
         source.value = ta.value;
       });
+      // 目录控件：改了就把配置写进 URL 并重新加载（单例限制，见上）
+      const tocNumber = document.getElementById('toc-number');
+      const tocMulti = document.getElementById('toc-multi');
+      const tocLevel = document.getElementById('toc-level');
+      tocNumber.checked = toc.showAutoNumber;
+      tocMulti.checked = toc.allowMultiToc;
+      tocLevel.value = toc.level.join(',');
+      for (const el of [tocNumber, tocMulti, tocLevel]) {
+        el.addEventListener('change', () => {
+          const next = new URLSearchParams(location.search);
+          if (tocNumber.checked) next.set('tocNumber', '1');
+          else next.delete('tocNumber');
+          next.set('tocMulti', tocMulti.checked ? '1' : '0');
+          if (!tocLevel.value || tocLevel.value === '2,3') next.delete('tocLevel');
+          else next.set('tocLevel', tocLevel.value);
+          location.assign(`${location.pathname}${next.size ? `?${next}` : ''}`);
+        });
+      }
       document.getElementById('diagram-driver').addEventListener('change', (event) => {
         driver.value = event.target.value;
       });

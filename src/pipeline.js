@@ -1,15 +1,28 @@
 // Markdown → Vue 组件的完整管线（移植自 mdoc 的解析方式）
 // markdown → template 字符串 → Vue 运行时编译；Prism 同步高亮、KaTeX 异步增强在编译前完成
-import { compile, defineComponent, markRaw } from 'vue';
+import { compile, defineComponent, Fragment, markRaw } from 'vue';
 import { styleMixin } from 'vue-style-runtime';
 
 import { assertConfigCompatible } from './config.js';
+import { createEChartsBlock } from './echarts.js';
+import { createEChartsTableBlock } from './echarts-table.js';
 import { parseFrontmatter } from './frontmatter.js';
 import { mountImageZoom } from './image-zoom.js';
 import { ensureEmojiPlugin } from './markdown-it.js';
 import { createScriptModule, createSetup } from './markdown-script.js';
 import { createMermaidBlock } from './mermaid.js';
 import { escapeInvalidInterpolations, renderMarkdown } from './render.js';
+
+// 多根（Fragment）组件的 this.$el 只指向第一个根节点；这里从 subTree 收集全部根元素，
+// 供 mountImageZoom 等需要遍历组件 DOM 的逻辑使用。
+function collectComponentRoots(instance) {
+  const subTree = instance.$.subTree;
+  if (!subTree) return [];
+  if (subTree.type === Fragment && Array.isArray(subTree.children)) {
+    return subTree.children.map((child) => child?.el).filter((el) => el && el.nodeType === 1);
+  }
+  return subTree.el && subTree.el.nodeType === 1 ? [subTree.el] : [];
+}
 
 // 剥离第一个顶级的 <script>（页面级脚本，围栏内的不动），style 块全部剥离经 styleMixin 注入组件。
 // 页面级脚本只会有一个：其后正文里出现的 <script> 属于文档内容，原样保留不剥离。
@@ -114,11 +127,14 @@ export async function createMarkdownComponent(source, dir, config, { frontmatter
     components: {
       ClientOnly: { template: '<slot />' },
       MermaidBlock: createMermaidBlock(config?.mermaidDriver),
+      EChartsBlock: createEChartsBlock(config?.echarts),
+      // 表格首格 :line: 等声明渲染成 <EChartsTableBlock>，图表由组件画，管线不碰 DOM
+      EChartsTableBlock: createEChartsTableBlock(config?.echarts),
     },
     // 图片缩放：medium-zoom 动态加载，仅当正文有可放大图片时挂载
     async mounted() {
-      // 只在组件根节点内装配缩放，多份 md 同页互不干扰
-      await mountImageZoom(this.$el).catch(() => {});
+      // 多根组件 this.$el 只指向第一个根，取全部根节点，多份 md 同页互不干扰
+      await mountImageZoom(collectComponentRoots(this)).catch(() => {});
     },
   };
   // 普通 <script>：默认导出选项对象（components/data/methods…）并入组件，正文即可用其注册的组件标签

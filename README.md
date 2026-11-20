@@ -9,9 +9,9 @@ const greeting = '你好，mdi2esm'
 
 # mdi2esm
 
-A markdown-it wrapper with common plugins integrated. It renders Markdown into VitePress-style HTML, with code highlighting, math (KaTeX), Mermaid diagrams, outlines and image zoom built in. The core markdown stack and Prism are bundled into a single browser-ready ESM artifact; framework and heavy dependencies are left as peers for the host to provide.
+A markdown-it wrapper with common plugins integrated. It renders Markdown into VitePress-style HTML, with code highlighting, math (KaTeX), Mermaid diagrams, ECharts charts, outlines and image zoom built in. The core markdown stack and Prism are bundled into a single browser-ready ESM artifact; framework and heavy dependencies are left as peers for the host to provide.
 
-> 这份 README 就是 demo 的渲染源：左侧可实时编辑，右侧渲染。它同时是包文档和能力全景——基础语法、容器、GitHub alerts、脚注、任务列表、图标与 emoji 短码、CJK 混排、属性、目录、代码高亮、数学、图表、图片缩放，以及宿主注入的组件（`<Badge>` / `<Icon>`）和 `<script setup>`。
+> 这份 README 就是 demo 的渲染源：左侧可实时编辑，右侧渲染。它同时是包文档和能力全景——基础语法、容器、GitHub alerts、脚注、任务列表、图标与 emoji 短码、CJK 混排、属性、目录、代码高亮、数学、图表（含表格转图表）、图片缩放，以及宿主注入的组件（`<Badge>` / `<Icon>`）和 `<script setup>`。
 
 ::: tip 关于这份文档
 顶部有 frontmatter（`title` / `description`）和一个 `<script setup>`，都由库的渲染管线处理（`createMarkdownComponent` 内部走的就是它）。下面的 `{{ greeting }}` 就是 setup 里定义的变量：**{{ greeting }}**。
@@ -32,6 +32,123 @@ graph TD
 
 围栏会被渲染成 `<MermaidBlock graph="…">`（源码经 `encodeURIComponent` 传入），图形由该组件在自身挂载后写入自己的根节点，不查 document，页面上有几份 Markdown 互不干扰。`pele` 和 `mermaid` 都是动态 `import()`，没有图表就不会加载，未选中的驱动也不会加载。`pele` 的 `--pele-*` 配色变量由组件内联从 `--vp-*` 派生，宿主不引包内 CSS（如只引 JS 的宿主）也能随暗色主题切换。
 
+## ECharts 图表
+
+```echarts
+{
+  title: {
+    text: '利用代码块直接渲染'
+  },
+  tooltip: {
+    trigger: 'axis',
+    axisPointer: {
+      type: 'cross',
+      label: {
+        backgroundColor: '#6a7985'
+      }
+    }
+  },
+  legend: {
+    data: ['Email', 'Union Ads', 'Video Ads', 'Direct', 'Search Engine']
+  },
+  toolbox: {
+    feature: {
+      saveAsImage: {}
+    }
+  },
+  xAxis: [
+    {
+      type: 'category',
+      boundaryGap: false,
+      data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    }
+  ],
+  yAxis: [
+    {
+      type: 'value'
+    }
+  ],
+  series: [
+    {
+      name: 'Email',
+      type: 'line',
+      stack: 'Total',
+      areaStyle: {},
+      emphasis: {
+        focus: 'series'
+      },
+      data: [120, 132, 101, 134, 90, 230, 210]
+    },
+    {
+      name: 'Union Ads',
+      type: 'line',
+      stack: 'Total',
+      areaStyle: {},
+      emphasis: {
+        focus: 'series'
+      },
+      data: [220, 182, 191, 234, 290, 330, 310]
+    },
+    {
+      name: 'Video Ads',
+      type: 'line',
+      stack: 'Total',
+      areaStyle: {},
+      emphasis: {
+        focus: 'series'
+      },
+      data: [150, 232, 201, 154, 190, 330, 410]
+    },
+    {
+      name: 'Direct',
+      type: 'line',
+      stack: 'Total',
+      areaStyle: {},
+      emphasis: {
+        focus: 'series'
+      },
+      data: [320, 332, 301, 334, 390, 330, 320]
+    },
+    {
+      name: 'Search Engine',
+      type: 'line',
+      stack: 'Total',
+      label: {
+        show: true,
+        position: 'top'
+      },
+      areaStyle: {},
+      emphasis: {
+        focus: 'series'
+      },
+      data: [820, 932, 901, 934, 1290, 1330, 1320]
+    }
+  ]
+};
+```
+
+`echarts` 围栏的内容是 **ECharts option（JS 对象字面量，可含函数）**，渲染成 `<EChartsBlock code="…">`（同样 `encodeURIComponent` 进属性），组件用 Blob URL 动态 `import()` 求值（与 `<script>` 同一机制）后 `echarts.init` + `setOption` 画在自己的根节点上。echarts 是**可选 peer**（`^6.1.0`）：动态 `import()`，未安装或加载失败时降级为源码 `<pre class="echarts-source">` 并 `console.warn`；`npm i echarts` 即可启用。
+
+- option 是 JS 字面量，**可含函数**（`formatter` 等），直接粘贴 ECharts 官方示例即可；经 Blob URL 执行，宿主 CSP 需允许 `blob:`（与 `<script>` 相同）。
+
+- 高度默认 400px，`createConfig({ echarts: { height: 500 } })` 调整。
+- 随 `html.dark` 切换暗色主题（重建实例）、容器尺寸变化 `resize()`、组件卸载 `dispose()`。
+- option 解析/执行失败或 `setOption` 抛错时降级显示源码 + 错误信息，不留空白。
+- 库产物把 echarts 外部化，由宿主打包器或 importmap 提供；demo 构建会把它打进去。
+
+## 表格转图表
+
+表格首格写图表声明（`:类型:` 可跟 `{...}` option），表格即渲染为图表，图表在上、原表格保留在下：
+
+| :line: {title: {text: '季度销量'}} | Q1  | Q2  | Q3  |
+| ---------------------------------- | --- | --- | --- |
+| 产品A                              | 120 | 132 | 101 |
+| 产品B                              | 220 | 182 | 191 |
+
+- 类型名就是 ECharts 系列类型：`line` / `bar` / `pie` / `radar` / `scatter` / `funnel` 等，`{...}` 是 option 的 **JS 对象字面量**（可含函数，与 `echarts` 围栏同一套解析），不写默认 `{}`。
+- 数据映射：通用类型把表头作类目轴、每行一个 series（首列是系列名）；`pie` / `funnel` 取前两列（名称 / 数值）；`radar` 取表头作 indicator。
+- 高度沿用 `createConfig({ echarts: { height } })`；echarts 未安装或 option 解析失败时降级为源码卡片，原表格不受影响。
+
 ## 环境要求
 
 - Node.js >= 20（见 `package.json` 的 `engines`）。
@@ -46,8 +163,10 @@ npm i mdi2esm
 同时安装 peer 依赖（用到哪些功能装哪些；完整能力需要全部）：
 
 ```sh
-npm i mdi2esm vue vue-style-runtime katex mermaid pele
+npm i mdi2esm vue vue-style-runtime katex mermaid pele echarts
 ```
+
+`echarts` 是可选的：不装时 `echarts` 围栏降级为源码块，其余功能不受影响。
 
 ## 用法
 
@@ -103,7 +222,7 @@ createApp({ render: () => h(component) }).mount(document.getElementById('content
 
 ### 不打包：浏览器原生 ESM + importmap
 
-`dist/index.min.js` 本身就是浏览器可加载的 ESM，静态导入只有 `vue` 和 `vue-style-runtime` 两个（`katex` / `pele` / `mermaid` 是动态 `import()`，用到才加载）。所以连 Vite 都不需要，importmap 映射 peer 即可：
+`dist/index.min.js` 本身就是浏览器可加载的 ESM，静态导入只有 `vue` 和 `vue-style-runtime` 两个（`katex` / `pele` / `mermaid` / `echarts` 是动态 `import()`，用到才加载）。所以连 Vite 都不需要，importmap 映射 peer 即可（`echarts` 可省略，省略时降级为源码块）：
 
 ```html
 <script type="importmap">
@@ -111,7 +230,8 @@ createApp({ render: () => h(component) }).mount(document.getElementById('content
     "imports": {
       "vue": "/node_modules/vue/dist/vue.esm-browser.prod.js",
       "vue-style-runtime": "/node_modules/vue-style-runtime/dist/index.min.js",
-      "pele": "/node_modules/pele/dist/pele.js"
+      "pele": "/node_modules/pele/dist/pele.js",
+      "echarts": "/node_modules/echarts/dist/echarts.esm.min.js"
     }
   }
 </script>
@@ -204,7 +324,15 @@ import 'katex/dist/katex.min.css';
 
 [[toc]]
 
-正文的 `[[toc]]` 自动生成上面的目录（`.table-of-contents`，卡片式、按层级缩进）。右侧"大纲"栏由 `buildOutline(headings)` 从 h2–h6 生成，两者互相独立，见下面的「大纲」。
+正文的 `[[toc]]` 自动生成上面的目录（`.table-of-contents`，卡片式、按层级缩进）。右侧“大纲”栏由 `buildOutline(headings)` 从 h2–h6 生成，两者互相独立，见下面的「大纲」。
+
+目录行为由 `createConfig({ markdown: { toc } })` 配置：
+
+- `level`：目录包含的标题层级，默认 `[2, 3]`；
+- `showAutoNumber`：标题与目录自动编号（`1` / `1.1` / …），默认 `false`；编号只作展示，不进锚点与 `headings`；
+- `allowMultiToc`：是否允许多个 `[[toc]]`，默认 `true`；设为 `false` 时只渲染第一个，其余忽略并 `console.warn`。
+
+demo 顶部提供这三个配置的开关（编号 / 多目录 / 层级），改动经 URL 参数写入并重新加载生效——`md` 是模块级单例，配置在首次渲染时锁定，运行中切换不生效。
 
 ## 基础语法
 
@@ -453,6 +581,33 @@ const e = 5;
 
 `[示例.js]` 给代码块加标题，`{1,3}` 高亮指定行，`:line-numbers=2` 从第 2 行开始编号。
 
+### Diff 高亮
+
+标准 Git Diff 写法（`diff` 以及 `diff-语言`）由 Prism 的 diff 语法高亮，增删行按行首 `+` / `-` 整行标色，与 notation 共用同一套 `.diff` 行样式：
+
+```diff
+--- a/x.js
++++ b/x.js
+@@ -1,3 +1,3 @@
+ const a = 1;
+-const b = 2;
++const b = 3;
+```
+
+`diff-语言`（如 `diff-js`）在未注册对应语法时按 diff 语法高亮：
+
+```diff-js
++const a = 1;
+-const b = 2;
+```
+
+同时兼容 VitePress 的行尾标记 `[!code ++]` / `[!code --]`：标记与注释一并移除，整行加背景色。
+
+```js
+const a = 1; // [!code ++]
+const b = 2; // [!code --]
+```
+
 ### 代码组（多 Tab）
 
 ::: code-group
@@ -502,6 +657,33 @@ $$
 点击第一张图片可用 medium-zoom 放大（图为本地资源，离线也能显示）；被链接包裹的图片按规则排除缩放。图片还被自动加上 `loading="lazy"`。
 
 复制按钮、code-group 切 tab、图片缩放这些交互**由库自带**：复制与切 tab 是文档级的一次 click 委托（对齐 VitePress 的 copyCode/codeGroups），缩放由组件挂载后动态 `import('medium-zoom')` 装配（仅当正文有可放大图片；未安装 medium-zoom 时静默跳过）。宿主零配置；要换剪贴板策略或缩放库时才需要自己在宿主侧接管。
+
+## 音视频
+
+!video[MDN 示例视频](https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4)
+
+!audio[示例音频](https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3)
+
+`!video[标题](url)` / `!audio[标题](url)` 渲染为原生 `<video controls>` / `<audio controls>`，标题作为 `title` 属性与回退文本，无额外依赖、浏览器原生播放。URL 策略与图片一致：相对路径按当前文档 `dir` 解析并经 `adapters.toSrc` 加 `base` 前缀，`http(s)` / `data:` 原样保留；`@include` 被包含文件里的媒体同样按其所在目录解析。
+
+## 时间线
+
+:::timeline 发展历程
+:: [milestone] 2021-07 项目开源
+mdi2esm 正式开源
+:: [done] 2024-05 支持流式增量渲染
+提供**流式**渲染的[包](https://example.com/pkg)
+:: [doing] 持续迭代
+
+- 丰富语法生态
+- 持续修复反馈
+  :: [todo] 拥抱社区
+  欢迎贡献
+  :: [error] VSCode 插件
+  对齐主仓
+  :::
+
+`:::timeline [标题]` 声明容器，内部用独占一行的 `::` 分隔节点；节点首行 `[状态] [日期] 标题`（日期可省），其后为描述（按普通 markdown 渲染，链接/图片同样走 `dir` 重写）。状态修饰符：`done`（`x`/`✓`）、`doing`（`~`/`…`）、`todo`（默认，`[ ]`/`[]`）、`milestone`（`*`/`★`）、`error`（`!`/`×`）。未闭合的 `:::timeline` 不渲染为时间线（交回普通 markdown）。
 
 ## 脚本能力（script setup）
 
@@ -597,7 +779,9 @@ const { html, lang, ok } = highlightBlock(code, 'ts', { meta: '{2,4-5}' });
 - 就绪：`ensureMarkdownReady`（挂载可选 emoji，幂等）
 - 底层：`md`（共享的 markdown-it 实例，需要自己 `parse` token 时用）
 
-`renderMarkdown(source, { dir, config })` 异步返回 `{ html, headings }`，**不等待 emoji 挂载**（首次渲染可能未启用 emoji，需要就绪先 `await ensureMarkdownReady()`）；`createMarkdownComponent` 会先等待 emoji 就绪。**单配置进程**：`md` 是模块级单例，一个进程只服务一套配置；切换会影响渲染的配置时 `assertConfigCompatible` 会 `console.warn`，且仅首份配置生效。
+图表相关配置：`mermaidDriver`（`pele` | `mermaid`）与 `echarts: { height }`（默认 400）。
+
+`renderMarkdown(source, { dir, config })` 异步返回 `{ html, headings }`，**不等待 emoji 挂载**（首次渲染可能未启用 emoji，需要就绪先 `await ensureMarkdownReady()`）；`createMarkdownComponent` 会先等待 emoji 就绪。`md` 是模块级单例，**一个进程只服务一套配置**——但这是实现现状、不是架构必然：真正把配置锁死成“首份生效”的只有三处改了 `md` 实例本身的操作（`mark/sub/sup` 的 `ruler.disable`、自定义容器累积注册、emoji 的 `md.use`），其余配置（`dir` / `adapters` / `level` / `lineNumbers` 等）都经每次渲染的 `env` 隔离、本身可多配置共存。切换会影响渲染的配置时 `assertConfigCompatible` 会 `console.warn`，且仅首份配置生效；SPA 多实例、测试隔离、热更新、多站点复用受此限制，属于可偿还的实现债（中期方向 `createMarkdownRenderer(config)` 工厂）。
 
 ## 开发
 

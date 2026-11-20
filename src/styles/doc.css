@@ -465,12 +465,16 @@
   background-color: var(--vp-code-line-warning-color);
 }
 
+/* notation（[!code ++]/--）整行 diff 背景：block 级独占一行，宽度多出左右各 1.5rem 并负外边距抵消，
+   使背景延伸到 code 的 padding 之外（全宽）；用 block 而非 inline-block，
+   避免与 code 的 fit-content 宽度叠加后行盒超宽、inline 排列错位 */
 .vp-doc [class*='language-'] code .diff {
-  transition: background-color 0.5s;
+  position: relative;
+  display: block;
+  width: calc(100% + 2 * 1.5rem);
   margin: 0 -1.5rem;
   padding: 0 1.5rem;
-  width: calc(100% + 2 * 1.5rem);
-  display: inline-block;
+  transition: background-color 0.5s;
 }
 
 .vp-doc [class*='language-'] code .diff::before {
@@ -962,12 +966,24 @@
 
 /* Prism token 配色（GitHub Light / Dark），替代原 VitePress 的 --shiki-* 变量。
    行号、copy 按钮与 .line 结构仍由 vp-doc.css 提供。 */
-.vp-doc .line {
-  display: inline-block;
+/* 限定 code 的直接子元素，避免误伤同含 line class 的其他元素。
+   :not(.diff) 是因为 .diff 行要覆盖宽度（全宽背景），同特异性下后写者胜。
+   code 改 white-space:normal：.line 是块级，块间的换行文本节点（wrapLines 拼接产生）
+   不再生成空行盒；行内缩进与空格由 .line 的 pre 保留 */
+.vp-doc [class*='language-'] code {
+  white-space: normal;
+}
+
+.vp-doc [class*='language-'] code > .line {
+  white-space: pre;
+}
+
+.vp-doc [class*='language-'] code > .line:not(.diff) {
+  display: block;
   width: 100%;
 }
 
-.vp-doc .line.highlighted {
+.vp-doc [class*='language-'] code > .line.highlighted {
   background-color: var(--vp-code-line-highlight-color, rgba(127, 127, 127, 0.12));
 }
 
@@ -1136,11 +1152,105 @@
   border-radius: 2px;
 }
 
+/* 自动编号（config.markdown.toc.showAutoNumber）：标题与目录共用 */
+.vp-doc .toc-number {
+  margin-inline-end: 0.35em;
+  color: var(--vp-c-text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 时间线（:::timeline） ---- */
+.vp-doc .mdi-timeline {
+  margin: 1em 0;
+  padding: 16px 20px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+}
+
+.vp-doc .mdi-timeline__header {
+  margin-bottom: 12px;
+  font-weight: 600;
+  font-size: 1.05em;
+}
+
+.vp-doc .mdi-timeline__item {
+  position: relative;
+  padding-left: 22px;
+  padding-bottom: 16px;
+}
+
+.vp-doc .mdi-timeline__item:last-child {
+  padding-bottom: 0;
+}
+
+/* 竖向连接线（节点之间） */
+.vp-doc .mdi-timeline__item::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 16px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--vp-c-divider);
+}
+
+.vp-doc .mdi-timeline__item:last-child::before {
+  display: none;
+}
+
+.vp-doc .mdi-timeline__node {
+  position: absolute;
+  left: 0;
+  top: 5px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--vp-c-text-3);
+}
+
+.vp-doc .mdi-timeline__item--done .mdi-timeline__node {
+  background: var(--vp-c-success-1, #16a34a);
+}
+
+.vp-doc .mdi-timeline__item--doing .mdi-timeline__node {
+  background: var(--vp-c-brand-1, #3b82f6);
+}
+
+.vp-doc .mdi-timeline__item--milestone .mdi-timeline__node {
+  background: var(--vp-c-brand-1, #3b82f6);
+  box-shadow: 0 0 0 3px var(--vp-c-brand-soft, rgba(59, 130, 246, 0.2));
+}
+
+.vp-doc .mdi-timeline__item--error .mdi-timeline__node {
+  background: var(--vp-c-danger-1, #dc2626);
+}
+
+.vp-doc .mdi-timeline__time {
+  color: var(--vp-c-text-2);
+  font-size: 0.85em;
+}
+
+.vp-doc .mdi-timeline__title {
+  font-weight: 600;
+}
+
+.vp-doc .mdi-timeline__desc {
+  color: var(--vp-c-text-2);
+}
+
+.vp-doc .mdi-timeline__desc > :first-child {
+  margin-top: 0;
+}
+
+.vp-doc .mdi-timeline__desc > :last-child {
+  margin-bottom: 0;
+}
+
 /* ---- 页内目录（边栏） ---- */
 /* 数值与 VitePress 的 VPDocAsideOutline / VPDocOutlineItem 保持一致：
    1px 发丝线、1rem 内缩、容器 13px/500、链接 14px/400/行高 2.2857143、
-   当前项取 text-1（不改字重）、独立 2px 品牌色标记。mdoc 用 VitePress 组件，
-   这里只有变量来源不同，渲染结果应当一致。 */
+   独立 2px 品牌色标记。当前项在 VitePress 基础上再加强：品牌色文字 + 600 字重，
+   避免与 hover 的 text-1 混淆、保证弱对比环境下也可辨。 */
 .vp-doc-outline {
   position: sticky;
   top: 1rem;
@@ -1190,10 +1300,15 @@
   transition: color 0.5s;
 }
 
-.vp-doc-outline a:hover,
+.vp-doc-outline a:hover {
+  color: var(--vp-c-text-1);
+  transition: color 0.25s;
+}
+
 .vp-doc-outline a.active,
 .vp-doc-outline a[aria-current='location'] {
-  color: var(--vp-c-text-1);
+  color: var(--vp-c-brand-1);
+  font-weight: 600;
   transition: color 0.25s;
 }
 
@@ -1221,6 +1336,27 @@
 .vp-doc .mermaid-rendered {
   margin: 1rem 0;
   overflow-x: auto;
+}
+
+/* ECharts 容器：高度由组件内联（config.echarts.height），宽度自适应 */
+.vp-doc .echarts-rendered {
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
+/* ECharts 降级源码：与 mermaid-source 同款卡片 */
+.vp-doc .echarts-source {
+  margin: 1rem 0;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background-color: var(--vp-code-block-bg);
+  font-family: var(--vp-font-family-mono);
+  font-size: var(--vp-code-font-size);
+}
+
+/* 表格转图表：容器宽度撑满，高度由组件内联 */
+.vp-doc .echarts-table-chart {
+  width: 100%;
 }
 
 .vp-doc .mermaid-source {

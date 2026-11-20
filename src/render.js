@@ -94,6 +94,12 @@ md.core.ruler.push('link_rewrite', (state) => {
         const resolved = src.startsWith('/') ? src : resolvePath(dir, src);
         child.attrSet('src', adapters.toSrc({ src, resolved }));
         child.attrSet('loading', 'lazy');
+      } else if (child.type === 'media') {
+        let src = child.attrGet('src') ?? '';
+        // 与图片同策略：协议 URL / data 原样，相对路径按 dir 解析后走 toSrc
+        if (/^(https?:|mailto:|#|data:)/i.test(src)) continue;
+        const resolved = src.startsWith('/') ? src : resolvePath(dir, src);
+        child.attrSet('src', adapters.toSrc({ src, resolved }));
       }
     }
   }

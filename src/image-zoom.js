@@ -21,9 +21,12 @@ function zoomableImages(root) {
   );
 }
 
-export async function mountImageZoom(root) {
-  if (!root) return;
-  const images = zoomableImages(root);
+// roots 可为单个根节点或数组：markdown 组件是多根（Fragment），this.$el 只指向第一个根，
+// 调用方需把组件的全部根节点传进来，否则只有第一个根内的图片会被装配。
+export async function mountImageZoom(roots) {
+  const list = (Array.isArray(roots) ? roots : [roots]).filter(Boolean);
+  if (list.length === 0) return;
+  const images = list.flatMap((root) => zoomableImages(root));
   if (images.length === 0) return;
 
   const module = await loadZoom();

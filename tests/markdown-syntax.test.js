@@ -31,6 +31,23 @@ test('三者在代码块内不生效', async () => {
   assert.ok(!html.includes('<sup>'));
 });
 
+test('```diff 代码块按行加 .diff 标记（复用 notation 行样式）', async () => {
+  const html = await render('```diff\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-old\n+new\n```');
+  assert.match(html, /class="line diff add"/);
+  assert.match(html, /class="line diff remove"/);
+  // 文件头与 hunk 头不标
+  assert.match(html, /<span class="line"><span class="token coord">--- a\/x<\/span><\/span>/);
+  // Prism diff 语法的 +/- 符号 span 已移除，符号由 .diff::before 画
+  assert.ok(!html.includes('token prefix'));
+});
+
+test('fence：[!code ++]/-- notation 移除标记并加整行类', async () => {
+  const html = await render("```js\nmsg: 'Removed' // [!code --]\nmsg: 'Added' // [!code ++]\n```");
+  assert.match(html, /class="line diff remove"/);
+  assert.match(html, /class="line diff add"/);
+  assert.ok(!html.includes('[!code'));
+});
+
 test('markdown.mark/sub/sup: false 时移除对应规则', () => {
   // 规则开关按 md 单例生效，必须在独立进程里验证
   const script = `

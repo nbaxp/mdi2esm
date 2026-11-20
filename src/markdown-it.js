@@ -16,6 +16,7 @@ import cjkFriendly from 'markdown-it-cjk-friendly';
 import { applyCodeBlock } from './code-block.js';
 import { CONTAINER_LABELS } from './config.js';
 import { applyRestoreEntities, applyTablePlugin, extractLang } from './markdown-plugins.js';
+import { applyTableChart } from './table-chart.js';
 
 const md = new MarkdownIt({ html: true, linkify: true });
 // 对齐 mdoc / VitePress：只认显式协议链接，裸域名不自动成链
@@ -24,6 +25,8 @@ md.linkify.set({ fuzzyLink: false });
 // 移植自 mdoc：VitePress 官方纯规则（实体还原、表格可聚焦），须在插件注册前挂接
 applyRestoreEntities(md);
 applyTablePlugin(md);
+// 表格首格 :line: / :bar: 等声明 → 前置 <EChartsTableBlock>（原表格保留）
+applyTableChart(md);
 
 // 官方 markdown.ts:458-524 的社区插件顺序；fence 不进 attrs，
 // 让 {1,3} / :line-numbers 等元信息原样交给 Prism 行标记与行号插件
@@ -57,6 +60,34 @@ md.inline.ruler.after('escape', 'icon_shortcode', (state, silent) => {
 // 属性值只可能含 [a-z0-9:+_-]，无需再转义；标签由 Vue 模板编译成宿主注入的组件
 md.renderer.rules.icon_shortcode = (tokens, idx) => `<Icon icon="${tokens[idx].content}" />`;
 
+// 音视频嵌入：!video[标题](url) / !audio[标题](url)（对齐 cherry 语法）。
+// src 与图片一样在 link_rewrite 里按 env.dir / adapters 重写，渲染层不拼路径。
+const MEDIA_RE = /^!(video|audio)\[([^\]]*)\]\(([^)\s]+)\)/;
+
+md.inline.ruler.after('escape', 'media', (state, silent) => {
+  if (state.src.charCodeAt(state.pos) !== 0x21 /* ! */) return false;
+  const match = MEDIA_RE.exec(state.src.slice(state.pos, state.posMax));
+  if (!match) return false;
+  if (!silent) {
+    const token = state.push('media', '', 0);
+    token.attrSet('type', match[1]);
+    token.attrSet('title', match[2]);
+    token.attrSet('src', match[3]);
+  }
+  state.pos += match[0].length;
+  return true;
+});
+
+md.renderer.rules.media = (tokens, idx) => {
+  const token = tokens[idx];
+  const type = token.attrGet('type') === 'audio' ? 'audio' : 'video';
+  const src = md.utils.escapeHtml(token.attrGet('src') ?? '');
+  const title = token.attrGet('title') ?? '';
+  const titleAttr = title ? ` title="${md.utils.escapeHtml(title)}"` : '';
+  const fallback = title ? md.utils.escapeHtml(title) : '您的浏览器不支持';
+  return `<${type} class="vp-media" controls src="${src}"${titleAttr}>${fallback}</${type}>`;
+};
+
 // emoji：用 markdown-it-emoji（不内置）——宿主提供了就启用（full 数据，GitHub / VitePress 同套），
 // 没装时动态 import 失败，静默回退，`:名字:` 按普通文本原样保留。
 // 插件挂载是异步的：管线的 createMarkdownComponent 会在首次渲染前 await（见 pipeline.js），
@@ -89,7 +120,20 @@ md.use(anchor, {
       .trim();
     const level = Number(state.tokens[idx].tag.slice(1));
     // 收集 h2-h6（h1 为页面标题不进目录）；AppToc 暂仍从渲染后 DOM 收集
-    if (level >= 2) state.env.headings?.push({ level, title, slug });
+    if (level >= 2) {
+      // 目录编号：h2 起分级计数（1 / 1.1 / …），存 env 供 [[toc]] 与标题前缀读取；
+      // 不进 slug 与 headings.title，锚点与右侧大纲保持稳定
+      const counters = (state.env.tocCounters ??= [0, 0, 0, 0, 0, 0, 0]);
+      counters[level] += 1;
+      for (let l = level + 1; l < counters.length; l += 1) counters[l] = 0;
+      const parts = [];
+      for (let l = 2; l <= level; l += 1) parts.push(counters[l]);
+      const number = parts.join('.');
+      const headingToken = state.tokens[idx];
+      headingToken.meta = { ...(headingToken.meta ?? {}), number };
+      (state.env.tocNumbersBySlug ??= {})[slug] = number;
+      state.env.headings?.push({ level, title, slug });
+    }
     children.push(
       Object.assign(new state.Token('text', '', 0), { content: ' ' }),
       Object.assign(new state.Token('link_open', 'a', 1), {
@@ -105,10 +149,83 @@ md.use(anchor, {
 });
 
 // [[toc]]：与 anchor 共用 slugify，format 还原 restoreEntities 保留的 &amp;
+// level 给全量（h2-h6），实际渲染按 config.markdown.toc.level 过滤
 md.use(tocPlugin, {
   slugify,
   format: (title) => title.replaceAll('&amp;', '&'),
+  level: [2, 6],
 });
+
+// 目录层级：config.markdown.toc.level，默认 h2-h3（对齐 VitePress）
+const tocLevelOf = (env) => {
+  const level = env?.config?.markdown?.toc?.level;
+  return Array.isArray(level) && level.length ? level : [2, 3];
+};
+
+// 目录树：与 buildOutline 同一套按 level 的栈式嵌套；level 是 [min, max] 区间语义
+function tocTree(headings, allowed) {
+  const levels = (Array.isArray(allowed) ? allowed : []).filter((n) => Number.isInteger(n) && n >= 1 && n <= 6);
+  const min = levels.length ? Math.min(...levels) : 2;
+  const max = levels.length ? Math.max(...levels) : 6;
+  const root = [];
+  const stack = [];
+  for (const heading of headings) {
+    if (heading.level < min || heading.level > max) continue;
+    const item = { link: `#${heading.slug}`, title: heading.title, slug: heading.slug, children: [] };
+    while (stack.length && stack[stack.length - 1].level >= heading.level) stack.pop();
+    if (stack.length) stack[stack.length - 1].item.children.push(item);
+    else root.push(item);
+    stack.push({ level: heading.level, item });
+  }
+  return root;
+}
+
+// 多目录：allowMultiToc=false 时只渲染第一个 [[toc]]，其余占位符输出空并告警
+md.core.ruler.after('anchor', 'toc_multi', (state) => {
+  if (state.env?.config?.markdown?.toc?.allowMultiToc === false) {
+    let seen = 0;
+    for (const token of state.tokens) {
+      if (token.type !== 'toc_body') continue;
+      seen += 1;
+      if (seen > 1) token.meta = { ...(token.meta ?? {}), skip: true };
+    }
+    if (seen > 1) {
+      console.warn('[mdi2esm] markdown.toc.allowMultiToc=false：只渲染第一个 [[toc]]，其余已忽略');
+    }
+  }
+});
+
+// 覆盖插件的 toc_body 渲染：支持层级过滤、自动编号、多目录跳过，
+// DOM 结构（nav.table-of-contents > ul > li > a）与插件默认保持一致
+md.renderer.rules.toc_body = (tokens, idx, options, env) => {
+  if (tokens[idx].meta?.skip) return '';
+  const showNumber = env?.config?.markdown?.toc?.showAutoNumber === true;
+  const numbers = env?.tocNumbersBySlug ?? {};
+  const list = (nodes) =>
+    `<ul>${nodes
+      .map((node) => {
+        const number = numbers[node.slug];
+        const prefix =
+          showNumber && number
+            ? `<span class="toc-number" aria-hidden="true">${md.utils.escapeHtml(number)}</span> `
+            : '';
+        const children = node.children.length ? list(node.children) : '';
+        return `<li><a href="${node.link}">${prefix}${md.utils.escapeHtml(node.title)}</a>${children}</li>`;
+      })
+      .join('')}</ul>`;
+  const tree = tocTree(env.headings ?? [], tocLevelOf(env));
+  return tree.length ? list(tree) : '';
+};
+
+// 标题编号：showAutoNumber 时给标题加编号前缀（编号存 anchor 写入的 token.meta）
+const defaultHeadingOpen =
+  md.renderer.rules.heading_open ?? ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options));
+md.renderer.rules.heading_open = (tokens, idx, options, env, self) => {
+  const open = defaultHeadingOpen(tokens, idx, options, env, self);
+  const number = tokens[idx].meta?.number;
+  if (!number || env?.config?.markdown?.toc?.showAutoNumber !== true) return open;
+  return `${open}<span class="toc-number" aria-hidden="true">${md.utils.escapeHtml(number)}</span> `;
+};
 
 // 容器名与 VitePress 官方 locales[].container 的键对齐
 const CONTAINER_NAMES = ['tip', 'info', 'warning', 'danger', 'details', 'note', 'important', 'caution'];
@@ -149,6 +266,119 @@ function attrPop(token, name) {
   if (index < 0) return null;
   return token.attrs.splice(index, 1)[0][1];
 }
+
+// 时间线：:::timeline [标题] 容器，内部用独占一行的 :: 分隔节点，
+// 节点首行 [状态] [日期] 标题，其后为描述（按普通 markdown 渲染）。
+// 必须注册在 plugin-container 之前，避免 :::timeline 先被通用容器规则尝试。
+const TIMELINE_OPEN_RE = /^ {0,3}:::timeline(?:[ \t]+(.*))?$/;
+const TIMELINE_SEP_RE = /^ {0,3}::(?:[ \t]+(.*))?$/;
+const TIMELINE_CLOSE_RE = /^ {0,3}:::[ \t]*$/;
+const TIMELINE_HEAD_RE = /^\[([^\]]*)\][ \t]*(.*)$/;
+const TIMELINE_DATE_RE = /^(\S+)[ \t]+(.*)$/;
+const TIMELINE_STATE_ALIASES = {
+  done: 'done',
+  x: 'done',
+  '✓': 'done',
+  doing: 'doing',
+  '~': 'doing',
+  '…': 'doing',
+  todo: 'todo',
+  ' ': 'todo',
+  '[]': 'todo',
+  milestone: 'milestone',
+  '*': 'milestone',
+  '★': 'milestone',
+  error: 'error',
+  '!': 'error',
+  '×': 'error',
+};
+
+function parseTimelineHead(text) {
+  const line = text.trim();
+  const match = TIMELINE_HEAD_RE.exec(line);
+  if (!match) return { state: 'todo', time: '', title: line };
+  const state = TIMELINE_STATE_ALIASES[String(match[1]).toLowerCase()] ?? 'todo';
+  const rest = match[2].trim();
+  if (!rest) return { state, time: '', title: '' };
+  const parts = TIMELINE_DATE_RE.exec(rest);
+  if (parts && /\d/.test(parts[1])) return { state, time: parts[1], title: parts[2].trim() };
+  return { state, time: '', title: rest };
+}
+
+function timelineRule(state, startLine, endLine, silent) {
+  const startText = state.src.slice(state.bMarks[startLine] + state.tShift[startLine], state.eMarks[startLine]);
+  const openMatch = TIMELINE_OPEN_RE.exec(startText);
+  if (!openMatch) return false;
+  let closeLine = -1;
+  for (let line = startLine + 1; line < endLine; line += 1) {
+    const text = state.src.slice(state.bMarks[line] + state.tShift[line], state.eMarks[line]);
+    if (TIMELINE_CLOSE_RE.test(text)) {
+      closeLine = line;
+      break;
+    }
+  }
+  if (closeLine === -1) return false; // 未闭合：交回普通 markdown
+  if (silent) return true;
+  const open = state.push('timeline_open', 'div', 1);
+  open.block = true;
+  open.meta = { title: (openMatch[1] ?? '').trim() };
+  open.map = [startLine, closeLine + 1];
+  let nodeStart = -1;
+  const flush = (from, to) => {
+    if (from < 0 || to <= from) return;
+    const rawLines = [];
+    for (let i = from; i < to; i += 1) {
+      rawLines.push(state.src.slice(state.bMarks[i] + state.tShift[i], state.eMarks[i]));
+    }
+    const head = parseTimelineHead(rawLines[0].replace(/^ {0,3}::/, ''));
+    const item = state.push('timeline_item', 'div', 1);
+    item.block = true;
+    item.meta = head;
+    item.content = rawLines.slice(1).join('\n');
+  };
+  for (let line = startLine + 1; line < closeLine; line += 1) {
+    const text = state.src.slice(state.bMarks[line] + state.tShift[line], state.eMarks[line]);
+    if (TIMELINE_SEP_RE.test(text)) {
+      flush(nodeStart, line);
+      nodeStart = line;
+    } else if (nodeStart === -1 && text.trim()) {
+      nodeStart = line; // 宽松：首个 :: 之前的非空行也当作一个节点
+    }
+  }
+  flush(nodeStart, closeLine);
+  const close = state.push('timeline_close', 'div', -1);
+  close.block = true;
+  state.line = closeLine + 1;
+  return true;
+}
+md.block.ruler.before('fence', 'timeline', timelineRule, { alt: ['paragraph', 'reference', 'blockquote', 'list'] });
+
+// 描述是独立子文档：渲染时用副本 env，避免节点内标题污染主文档的 headings / 编号计数，
+// 也不把主文档脚注（env.footnotes）带进节点
+const timelineDescEnv = (env) => ({
+  ...(env ?? {}),
+  headings: [],
+  tocNumbersBySlug: {},
+  tocCounters: [0, 0, 0, 0, 0, 0, 0],
+  footnotes: undefined,
+});
+
+md.renderer.rules.timeline_open = (tokens, idx) => {
+  const { title } = tokens[idx].meta;
+  const header = title ? `<div class="mdi-timeline__header">${md.utils.escapeHtml(title)}</div>` : '';
+  return `<div class="mdi-timeline">${header}<div class="mdi-timeline__body">\n`;
+};
+
+md.renderer.rules.timeline_item = (tokens, idx, options, env) => {
+  const { state, time, title } = tokens[idx].meta;
+  const descEnv = timelineDescEnv(env);
+  const timeHtml = time ? `<div class="mdi-timeline__time">${md.utils.escapeHtml(time)}</div>` : '';
+  const titleHtml = title ? `<div class="mdi-timeline__title">${md.renderInline(title, descEnv)}</div>` : '';
+  const desc = tokens[idx].content.trim() ? md.render(tokens[idx].content, descEnv) : '';
+  return `<div class="mdi-timeline__item mdi-timeline__item--${state}"><div class="mdi-timeline__node"></div><div class="mdi-timeline__content">${timeHtml}${titleHtml}<div class="mdi-timeline__desc">${desc}</div></div></div>\n`;
+};
+
+md.renderer.rules.timeline_close = () => '</div></div>\n';
 
 // v-pre / raw / code-group：与 vitepress containerPlugin 的注册顺序和 DOM 一致
 md.use(container, {

@@ -1,8 +1,8 @@
 // 独立代码块：给宿主组件用的同步高亮 API。
 // 与 markdown fence 共用 Prism 语法与行切分，输出不含复制按钮（交互由宿主决定）。
-import { wrapLines } from './code-lines.js';
+import { extractDiffMarks, extractNotationDiff, stripDiffPrefixes, wrapLines } from './code-lines.js';
 import { escapeHtml } from './markdown-plugins.js';
-import { highlightCode, normalizeLang } from './prism.js';
+import { highlightCode, isDiffLang, normalizeLang } from './prism.js';
 
 // 语言名只允许字母数字与 - _ + # .，避免拼进 class 属性时被注入
 const sanitizeLang = (name) => String(name ?? '').replace(/[^\w+#.-]/g, '');
@@ -20,9 +20,15 @@ const sanitizeLang = (name) => String(name ?? '').replace(/[^\w+#.-]/g, '');
  */
 export function highlightBlock(code, lang, { meta = '', className = '' } = {}) {
   const name = normalizeLang(lang) || 'text';
-  const highlighted = highlightCode(String(code ?? ''), name);
+  // [!code ++]/-- 先移除再高亮（与 fence 同一套提取逻辑）
+  const raw = String(code ?? '');
+  const extracted = extractNotationDiff(raw);
+  const cleaned = extracted.code;
+  const highlighted = highlightCode(cleaned, name);
   const ok = highlighted !== null;
-  const inner = wrapLines(ok ? highlighted : escapeHtml(String(code ?? '')), meta);
+  // ```diff / ```diff-xxx：按行首 +/- 生成行级标记（与 notation 共用 .diff 行样式）
+  const marks = extracted.marks ?? (isDiffLang(name) ? extractDiffMarks(cleaned) : null);
+  const inner = wrapLines(ok ? stripDiffPrefixes(highlighted) : escapeHtml(cleaned), meta, marks);
   const classes = [`language-${sanitizeLang(name) || 'text'}`, className].filter(Boolean).join(' ');
   return { html: `<pre class="${classes}"><code>${inner}</code></pre>`, lang: name, ok };
 }

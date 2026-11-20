@@ -8,7 +8,7 @@
 // 同一份源码的产物（库本体另出 index.js/index.min.js 供 npm 包），所有依赖打进 dist，
 // 无 importmap、无 node_modules 依赖。
 // 完整打包版内联 markdown 核心栈（markdown-it / @mdit* / @mdit-vue）与 Prism；其余框架与重依赖
-// （vue / vue-style-runtime / katex / mermaid / pele）外部化为 peer，
+// （vue / vue-style-runtime / katex / mermaid / pele / echarts）外部化为 peer，
 // 由消费方提供，避免重复实例与体积膨胀。
 import fs from 'node:fs';
 import path from 'node:path';
@@ -33,6 +33,7 @@ const peerBare = [
   'katex',
   'mermaid',
   'pele',
+  'echarts',
   'medium-zoom',
   'markdown-it-emoji',
 ];

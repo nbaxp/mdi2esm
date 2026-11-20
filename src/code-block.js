@@ -1,9 +1,9 @@
 // mdi2esm 自身的 fence 渲染：DOM 外壳对齐 VitePress preWrapper（button.copy + span.lang + pre）。
 // 复制与 code-group 切换的点击委托也在这里：文档级一次委托（对齐 VitePress copyCode/codeGroups），
 // 换剪贴板策略或改 tab 行为时改这一个文件即可，宿主零配置。
-import { wrapCodeLines } from './code-lines.js';
+import { extractDiffMarks, extractNotationDiff, stripDiffPrefixes, wrapCodeLines } from './code-lines.js';
 import { applyLineNumbers, extractLang, fenceMetaAttrs } from './markdown-plugins.js';
-import { highlightCode } from './prism.js';
+import { highlightCode, isDiffLang } from './prism.js';
 
 const COPY_RESET_MS = 2000;
 const copyTimers = new WeakMap();
@@ -115,11 +115,15 @@ export function applyCodeBlock(md) {
   // 因此高亮可以直接发生在渲染期，不再需要渲染后的 DOM 替换。
   md.options.highlight = (code, lang) => highlightCode(code, lang) ?? md.utils.escapeHtml(code);
 
-  function wrapPre(html, token, env) {
+  function wrapPre(html, token, env, notationMarks = null, diffMarks = null) {
     // ```mermaid 转成组件标签：SVG 由组件自己写进 DOM（模板编译会丢 SVG 里的 <style>），
     // 源码 encodeURIComponent 后再进属性，引号和换行不会破坏模板
     if (extractLang(token.info) === 'mermaid') {
       return `<MermaidBlock graph="${encodeURIComponent(token.content)}"></MermaidBlock>\n`;
+    }
+    // ```echarts 转成组件标签：option 是 JSON，组件自己 init/setOption
+    if (extractLang(token.info) === 'echarts') {
+      return `<EChartsBlock code="${encodeURIComponent(token.content)}"></EChartsBlock>\n`;
     }
     const lineMeta = fenceMetaAttrs(token.info);
     token.info = token.info.replace(/\[.*\]/, '');
@@ -131,12 +135,25 @@ export function applyCodeBlock(md) {
     const title = md.utils.escapeHtml(copy.tooltipText ?? '');
     const copied = md.utils.escapeHtml(copy.copiedText ?? '');
     const meta = md.utils.escapeHtml(token.info);
-    const withLines = wrapCodeLines(html, lineMeta);
+    // 行级着色：notation（[!code ++]/--）与 ```diff 共用同一套 .diff 行样式
+    const withLines = wrapCodeLines(stripDiffPrefixes(html), lineMeta, notationMarks ?? diffMarks);
     return `<div class="language-${lang}${active}" dir="ltr" data-meta="${meta}"><button class="copy" title="${title}" data-copied="${copied}"></button><span class="lang">${label}</span>${withLines}</div>`;
   }
   const defaultFence = md.renderer.rules.fence;
-  md.renderer.rules.fence = (tokens, idx, options, env, self) =>
-    wrapPre(defaultFence(tokens, idx, options, env, self).replace('<pre', '<pre v-pre'), tokens[idx], env);
+  md.renderer.rules.fence = (tokens, idx, options, env, self) => {
+    // [!code ++]/-- 在 Prism 高亮前移除：Prism 不会把标记当成注释，行号也按清理后行数对齐
+    const extracted = extractNotationDiff(tokens[idx].content);
+    if (extracted.code !== tokens[idx].content) tokens[idx].content = extracted.code;
+    // ```diff / ```diff-xxx：按行首 +/- 生成行级标记（与 notation 共用 .diff 行样式）
+    const diffMarks = isDiffLang(extractLang(tokens[idx].info)) ? extractDiffMarks(tokens[idx].content) : null;
+    return wrapPre(
+      defaultFence(tokens, idx, options, env, self).replace('<pre', '<pre v-pre'),
+      tokens[idx],
+      env,
+      extracted.marks,
+      diffMarks,
+    );
+  };
   const defaultCodeBlock = md.renderer.rules.code_block;
   md.renderer.rules.code_block = (tokens, idx, options, env, self) =>
     defaultCodeBlock(tokens, idx, options, env, self).replace('<pre', '<pre v-pre');

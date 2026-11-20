@@ -74,6 +74,7 @@
   },
   "peerDependencies": {
     "@iconify/vue": "^5.0.3",
+    "echarts": "^6.1.0",
     "katex": "0.19.1",
     "markdown-it-emoji": "^3.1.0",
     "medium-zoom": "^1.1.0",
@@ -84,6 +85,9 @@
   },
   "peerDependenciesMeta": {
     "@iconify/vue": {
+      "optional": true
+    },
+    "echarts": {
       "optional": true
     },
     "markdown-it-emoji": {
@@ -107,6 +111,7 @@
     "@html-eslint/eslint-plugin": "^0.68.0",
     "@html-eslint/parser": "^0.68.0",
     "@iconify/vue": "^5.0.3",
+    "echarts": "^6.1.0",
     "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",

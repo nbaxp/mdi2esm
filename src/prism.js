@@ -64,6 +64,10 @@ export function normalizeLang(lang) {
   return LANG_ALIASES[key] ?? key;
 }
 
+// ```diff / ```diff-xxx 是 Git diff 写法：Prism 的 diff 语法负责内容高亮，
+// 增删行背景由行级 .diff 标记（extractDiffMarks）复用 notation 样式实现
+export const isDiffLang = (lang) => /^diff(?:-[\w-]+)?$/i.test(String(lang ?? ''));
+
 /**
  * 高亮一段代码。
  * @param {string} code 源码
@@ -72,7 +76,8 @@ export function normalizeLang(lang) {
  */
 export function highlightCode(code, lang) {
   const name = normalizeLang(lang);
-  const grammar = Prism.languages[name];
+  // diff-xxx 语言 Prism 未注册语法，回落到 diff 语法
+  const grammar = Prism.languages[name] ?? (isDiffLang(name) ? Prism.languages.diff : undefined);
   if (!grammar) return null;
   try {
     return Prism.highlight(code, grammar, name);
