@@ -108,6 +108,11 @@ const toNumber = (value) => {
 // options 是用户写的字面量，仅作外层补充（title/legend/tooltip…）；series 与坐标轴由表格生成。
 export function buildTableChartOption(type, options, header, rows) {
   const base = options && typeof options === 'object' && !Array.isArray(options) ? { ...options } : {};
+  // 对齐 cherry 的 TitleOptionsHandler：声明里的 title 是字符串（如 {"title":"折线图"}），
+  // ECharts 6 要求 title 为对象，直接透传字符串会在 setOption 抛错。这里归一化成 {text}。
+  if (typeof base.title === 'string') {
+    base.title = { text: base.title.replace(/\s*,\s*$/, '') };
+  }
   const names = (Array.isArray(header) ? header : []).map((value) => String(value ?? ''));
   const records = (Array.isArray(rows) ? rows : []).map((row) => (Array.isArray(row) ? row : [row]));
   const chartType = String(type || 'line');
@@ -122,8 +127,137 @@ export function buildTableChartOption(type, options, header, rows) {
     return base;
   }
 
+  // 以下三类对齐 cherry-markdown 的列约定（见 cherry-table-echarts-plugin.js）
+  if (chartType === 'heatmap') {
+    const yData = records.map((row) => String(row[0] ?? ''));
+    const data = [];
+    records.forEach((row, yIndex) => {
+      row.slice(1).forEach((value, xIndex) => {
+        const num = toNumber(value);
+        if (num != null) data.push([xIndex, yIndex, num]);
+      });
+    });
+    const nums = data.map((item) => item[2]);
+    base.xAxis = base.xAxis ?? { type: 'category', data: names };
+    base.yAxis = base.yAxis ?? { type: 'category', data: yData };
+    base.visualMap = base.visualMap ?? {
+      min: nums.length ? Math.min(...nums) : 0,
+      max: nums.length ? Math.max(...nums) : 0,
+      calculable: true,
+      orient: 'horizontal',
+      left: 'center',
+      bottom: 0,
+    };
+    base.tooltip = base.tooltip ?? {
+      formatter: (params) => `${yData[params.data[1]]}<br/>${names[params.data[0]]}: ${params.data[2]}`,
+    };
+    base.series = [{ type: 'heatmap', data, label: { show: true } }];
+    return base;
+  }
+
+  if (chartType === 'sankey') {
+    const links = [];
+    const nodes = new Set();
+    records.forEach((row) => {
+      const source = String(row[0] ?? '').trim();
+      const target = String(row[1] ?? '').trim();
+      const value = toNumber(row[2]);
+      if (source && target && value != null && value > 0) {
+        links.push({ source, target, value });
+        nodes.add(source);
+        nodes.add(target);
+      }
+    });
+    base.tooltip = base.tooltip ?? { trigger: 'item' };
+    base.series = [
+      {
+        type: 'sankey',
+        layout: 'none',
+        emphasis: { focus: 'adjacency' },
+        orient: 'horizontal',
+        data: Array.from(nodes).map((name) => ({ name })),
+        links,
+        lineStyle: { color: 'source', curveness: 0.5 },
+      },
+    ];
+    return base;
+  }
+
+  if (chartType === 'scatter') {
+    const mapping = base['cherry:mapping'];
+    if (mapping !== undefined) delete base['cherry:mapping'];
+    // 图表声明占据表头首格，而数据行首格是点名。collectTable 抹掉声明格后，
+    // 官方示例的表头通常没有独立的"名称"列头，导致 names 比数据行少一列，
+    // names[i] 实际对应 row[i+1]。补一个占位列头使其与数据行同构，避免整体错位。
+    const firstRow = records.find((row) => row.length > 0);
+    const colNames = firstRow && names.length === firstRow.length - 1 ? ['', ...names] : names;
+    const colIndex = (column) => {
+      const i = colNames.indexOf(String(column ?? '').trim());
+      return i >= 0 ? i : null;
+    };
+    const keywordIndex = (keys) => {
+      const i = colNames.findIndex((h) => keys.some((k) => String(h).toLowerCase().includes(k)));
+      return i >= 0 ? i : null;
+    };
+    let xCol;
+    let yCol;
+    let sizeCol = null;
+    let groupCol = null;
+    if (mapping && typeof mapping === 'object' && !Array.isArray(mapping)) {
+      xCol = colIndex(mapping.x);
+      yCol = colIndex(mapping.y);
+      if (xCol == null || yCol == null) {
+        // 对齐 cherry：记录错误并返回空 series（不中断渲染）
+        console.warn(`[table-chart] scatter 缺少必需列（x/y）：${colNames.join(' | ')}`);
+        return { series: [] };
+      }
+      sizeCol = colIndex(mapping.size);
+      groupCol = colIndex(mapping.group ?? mapping.series);
+    } else {
+      xCol = keywordIndex(['x', '横坐标']) ?? 1;
+      yCol = keywordIndex(['y', '纵坐标']) ?? 2;
+      sizeCol = keywordIndex(['size', '大小']);
+      groupCol = keywordIndex(['series', 'group', '分组', '系列']);
+    }
+    const sizes = records.map((row) => toNumber(row[sizeCol])).filter((v) => v != null);
+    const minSize = sizes.length ? Math.min(...sizes) : 0;
+    const maxSize = sizes.length ? Math.max(...sizes) : 0;
+    const points = records.map((row) => ({
+      name: String(row[0] ?? ''),
+      x: toNumber(row[xCol]),
+      y: toNumber(row[yCol]),
+      size: sizeCol != null ? toNumber(row[sizeCol]) : null,
+      group: groupCol != null ? String(row[groupCol] ?? '').trim() || '系列1' : null,
+    }));
+    const groups = groupCol != null ? Array.from(new Set(points.map((p) => p.group))) : [null];
+    base.xAxis = base.xAxis ?? { type: 'value' };
+    base.yAxis = base.yAxis ?? { type: 'value' };
+    base.series = groups.map((group) => ({
+      name: group ?? undefined,
+      type: 'scatter',
+      data: points
+        .filter((p) => (groupCol != null ? p.group === group : true))
+        .map((p) => {
+          const item = { name: p.name, value: [p.x, p.y] };
+          item.symbolSize =
+            p.size == null
+              ? 10
+              : maxSize === minSize
+                ? 12
+                : Math.round(6 + ((p.size - minSize) / (maxSize - minSize)) * (28 - 6));
+          return item;
+        }),
+    }));
+    return base;
+  }
+
   if (chartType === 'radar') {
-    base.radar = base.radar ?? { indicator: names.map((name) => ({ name })) };
+    base.radar = base.radar ?? {};
+    base.radar.indicator = names.map((name, i) => {
+      const values = records.map((row) => toNumber(row[i + 1])).filter((v) => v != null);
+      if (!values.length) return { name };
+      return { name, max: Math.ceil(Math.max(...values) * 1.2) };
+    });
     base.series = [
       {
         type: 'radar',
