@@ -36,9 +36,28 @@ test('```diff 代码块按行加 .diff 标记（复用 notation 行样式）', a
   assert.match(html, /class="line diff add"/);
   assert.match(html, /class="line diff remove"/);
   // 文件头与 hunk 头不标
-  assert.match(html, /<span class="line"><span class="token coord">--- a\/x<\/span><\/span>/);
+  assert.match(html, /<span class="line"><span class="token coord"[^>]*>--- a\/x<\/span><\/span>/);
   // Prism diff 语法的 +/- 符号 span 已移除，符号由 .diff::before 画
   assert.ok(!html.includes('token prefix'));
+});
+
+test('嵌套 md 代码块内的 [!code] 是展示内容，不被处理', async () => {
+  const src = '````md\n```js\nconst a = 1 // [!code focus]\n```\n````';
+  const html = await render(src);
+  assert.ok(html.includes('[!code focus]'), html);
+  assert.ok(!html.includes('has-focus'), html);
+  assert.ok(!html.includes('has-focused-lines'), html);
+});
+
+test('普通 fence 内的 [!code] 仍正常处理（嵌套跳过不影响）', async () => {
+  const html = await render('```js\nconst a = 1 // [!code focus]\n```');
+  assert.ok(html.includes('has-focus'), html);
+  assert.ok(html.includes('has-focused-lines'), html);
+  assert.ok(!html.includes('[!code'));
+  // 对齐 VitePress：has-focused-lines 必须在 <pre> 上（官方 CSS 选择器要求它是 [language-*] 的后代），
+  // 不能挂在外层 div 上，否则聚焦模糊样式不生效
+  assert.match(html, /<pre[^>]*class="[^"]*has-focused-lines/);
+  assert.doesNotMatch(html, /<div class="language-js[^"]*has-focused-lines/);
 });
 
 test('fence：[!code ++]/-- notation 移除标记并加整行类', async () => {

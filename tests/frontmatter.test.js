@@ -90,5 +90,10 @@ test('parseFrontmatter 无 frontmatter 时返回空对象', () => {
 
 test('parseFrontmatter 未闭合时不动原文', () => {
   const source = '---\ntitle: T\n# 正文';
-  assert.deepEqual(parseFrontmatter(source), { body: source, data: {} });
+  assert.deepEqual(parseFrontmatter(source), { body: source, data: {}, bodyLine: 1 });
+});
+
+test('parseFrontmatter 返回 bodyLine（body 首行在原文中的行号）', () => {
+  assert.equal(parseFrontmatter('---\ntitle: T\n---\n# 正文').bodyLine, 4);
+  assert.equal(parseFrontmatter('# 无 frontmatter').bodyLine, 1);
 });

@@ -45,34 +45,71 @@ function splitHtmlLines(html) {
   return lines;
 }
 
-// VitePress/shiki notation diff：行尾注释里的 [!code ++] / [!code --] 标记整行增删。
-// 对齐 @shikijs/transformers transformerNotationDiff（v3 算法）：
-//   msg: 'Added' // [!code ++]  → 行加 diff add，注释（含 // 前缀）整段消失
-//   // [!code ++]               → 标记独占一行时整行删除
-//   [!code ++:2]                → 当前行与后一行（:2 表示共 2 行）
+// VitePress/shiki notation：行尾注释里的 [!code ...] 标记整行效果。
+// 对齐 @shikijs/transformers（v3 算法，4.5.0 默认）：
+//   msg: 'Added' // [!code ++]   → 行加 diff add，注释（含 // 前缀）整段消失
+//   // [!code ++]                → 标记独占一行时整行删除，且从下一行起算 :N
+//   [!code highlight] / hl      → 行加 highlighted
+//   [!code warning] / error / info → 行加 highlighted warning / error / info
+//   [!code focus] / focus:2     → 行加 has-focus，容器加 has-focused-lines
+//   [!code ++:2]                 → 从当前行（行尾注释）或下一行（独占注释）起共 2 行
 // VitePress 文档把 [!code 写成 [!!code 转义展示，这里单双叹号都认。
-// 返回 { code, marks }：code 为移除标记后的源码，marks 与输出行号对齐（无标记时 null）。
-const RE_NOTATION = /(\/{2}|#|;{1,2}|%{1,2}|--|\/\*|<!--)\s*\[!{1,2}code\s+(\+\+|--)(?::(\d+))?\]\s*(?:\*\/|-->)?\s*$/i;
+// 返回 { code, marks, focused, hasDiff, hasHighlighted }：code 为移除标记后的源码，
+// marks 与输出行号对齐（无标记时 null）；hasDiff/hasHighlighted 供外层拼 class。
+const RE_NOTATION =
+  /(\/{2}|#|;{1,2}|%{1,2}|--|\/\*|<!--)\s*\[!{1,2}code\s+(\+\+|--|highlight|hl|warning|error|info|focus)(?::(\d+))?\]\s*(?:\*\/|-->)?\s*$/i;
+const MARK_TYPES = {
+  '++': 'add',
+  '--': 'remove',
+  highlight: 'highlight',
+  hl: 'highlight',
+  warning: 'warning',
+  error: 'error',
+  info: 'info',
+  focus: 'focus',
+};
 
-export function extractNotationDiff(code) {
+export function extractNotation(code) {
   const src = String(code ?? '').split('\n');
-  const hits = new Map(); // 输入行号 → { type, span, index }
+  const hits = new Map(); // 输入行号 → { type, span, index, standalone }
+  // 嵌套 fence（如 md 代码块里的 ```js 示例）内的 [!code] 是文档展示内容，不是标记：
+  // 与 VitePress/Shiki 一致跳过嵌套层，避免输入示例里的标记被吞。
+  let fenceChar = null;
+  let fenceLen = 0;
   src.forEach((line, index) => {
+    const fence = /^(\s{0,3})(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fenceChar) {
+      if (fence && fence[2][0] === fenceChar && fence[2].length >= fenceLen && fence[3].trim() === '') {
+        fenceChar = null;
+      }
+      return;
+    }
+    if (fence) {
+      fenceChar = fence[2][0];
+      fenceLen = fence[2].length;
+      return;
+    }
     const match = RE_NOTATION.exec(line);
     if (match) {
       hits.set(index, {
-        type: match[2] === '++' ? 'add' : 'remove',
+        type: MARK_TYPES[match[2].toLowerCase()],
         span: Number(match[3] ?? 1) || 1,
         index: match.index,
+        standalone: line.slice(0, match.index).trim() === '',
       });
     }
   });
-  if (!hits.size) return { code: String(code ?? ''), marks: null };
+  if (!hits.size) {
+    return { code: String(code ?? ''), marks: null, focused: false, hasDiff: false, hasHighlighted: false };
+  }
 
-  // :N 会把当前行与后续行一起标记
+  // :N 会把起始行与后续行一起标记。v3：标记独占一行时起始行为下一行。
   const spanMark = new Map();
+  let focused = false;
   for (const [index, hit] of hits) {
-    for (let i = index; i < Math.min(index + hit.span, src.length); i += 1) {
+    if (hit.type === 'focus') focused = true;
+    const start = hit.standalone ? index + 1 : index;
+    for (let i = start; i < Math.min(start + hit.span, src.length); i += 1) {
       if (!spanMark.has(i)) spanMark.set(i, hit.type);
     }
   }
@@ -82,16 +119,23 @@ export function extractNotationDiff(code) {
   src.forEach((line, index) => {
     const hit = hits.get(index);
     if (hit) {
-      const text = line.slice(0, hit.index).trimEnd();
-      if (!text.trim()) return; // 注释独占一行：整行删除
-      out.push(text);
-      marks.push(hit.type);
-      return;
+      if (!hit.standalone) {
+        out.push(line.slice(0, hit.index).trimEnd());
+        marks.push(hit.type);
+      }
+      return; // 注释独占一行：整行删除
     }
     out.push(line);
     marks.push(spanMark.get(index) ?? null);
   });
-  return { code: out.join('\n'), marks };
+
+  let hasDiff = false;
+  let hasHighlighted = false;
+  for (const mark of marks) {
+    if (mark === 'add' || mark === 'remove') hasDiff = true;
+    if (mark === 'highlight' || mark === 'warning' || mark === 'error' || mark === 'info') hasHighlighted = true;
+  }
+  return { code: out.join('\n'), marks, focused, hasDiff, hasHighlighted };
 }
 
 // Prism diff 语法会把行首 +/- 包成 .token.prefix span，与 .diff 行样式的 ::before 符号重复，
@@ -114,8 +158,18 @@ export function extractDiffMarks(code) {
     });
 }
 
-// 给每个物理行加 .line 包裹，供 .highlighted / 行号样式复用。入参是 <code> 内层 HTML。
-// marks 为行级标记（extractNotationDiff 或 extractDiffMarks，无标记时传 null）。
+// 给每个物理行加 .line 包裹，供 .highlighted / .diff / 行号样式复用。入参是 <code> 内层 HTML。
+// marks 为行级标记（extractNotation 或 extractDiffMarks，无标记时传 null）。
+const MARK_CLASS = {
+  add: ' diff add',
+  remove: ' diff remove',
+  highlight: ' highlighted',
+  warning: ' highlighted warning',
+  error: ' highlighted error',
+  info: ' highlighted info',
+  focus: ' has-focus',
+};
+
 export function wrapLines(inner, meta, marks = null) {
   let body = inner;
   const trailing = body.endsWith('\n');
@@ -127,8 +181,8 @@ export function wrapLines(inner, meta, marks = null) {
   while (raw.length > 1 && !textOf(raw[raw.length - 1])) raw.pop();
   const lines = raw.map((line, index) => {
     const active = highlighted?.has(index + 1) ? ' highlighted' : '';
-    const diff = marks?.[index] ? ` diff ${marks[index]}` : '';
-    return `<span class="line${active}${diff}">${line || '<wbr>'}</span>`;
+    const mark = marks?.[index] ? (MARK_CLASS[marks[index]] ?? '') : '';
+    return `<span class="line${active}${mark}">${line || '<wbr>'}</span>`;
   });
   return lines.join('\n') + (trailing ? '\n' : '');
 }

@@ -28,6 +28,7 @@ test('配置：schema 与默认预设', () => {
     container: [],
     scripts: true,
     frontmatterParser: null,
+    image: { lazyLoad: false },
     toc: { level: [2, 3], showAutoNumber: false, allowMultiToc: true },
   });
 });
@@ -45,6 +46,7 @@ test('配置：createConfig 合并覆盖并按 locale 选文案', () => {
     container: [],
     scripts: true,
     frontmatterParser: null,
+    image: { lazyLoad: false },
     toc: { level: [2, 3], showAutoNumber: false, allowMultiToc: true },
   });
   const custom = createConfig({ adapters: { toSrc: ({ src }) => `/x/${src}` } });

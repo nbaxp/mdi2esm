@@ -1,0 +1,161 @@
+/* 代码块自写样式：Prism token 配色 + [title] 标题栏骨架。
+   - token 配色（GitHub Light / Dark）替代官方 shiki 的 --shiki-* 变量，取自 mdi2esm 0.3.0（8b5401c）；
+     行号、copy 按钮、.line 结构与高亮行背景均由官方 vp-doc.css 提供，这里不重复定义，仅保留 Prism 专属 token 色。
+   - 标题栏宽屏 margin 用 rem，跟随官方代码块（1rem -1.5rem / 40rem），宿主改根字号时不会错位。
+     原先按 data-title 匹配的官网专用 --icon 规则（含 SVG data URI）已移除：对通用库用户几乎不可触发，却占产物约 20KB。 */
+
+.vp-doc .line {
+  display: inline-block;
+  width: 100%;
+}
+
+:is(.vp-doc, .mdi-code) .token.comment,
+:is(.vp-doc, .mdi-code) .token.prolog,
+:is(.vp-doc, .mdi-code) .token.doctype,
+:is(.vp-doc, .mdi-code) .token.cdata {
+  color: #6a737d;
+}
+
+:is(.vp-doc, .mdi-code) .token.punctuation {
+  color: #24292f;
+}
+
+:is(.vp-doc, .mdi-code) .token.namespace {
+  opacity: 0.7;
+}
+
+:is(.vp-doc, .mdi-code) .token.property,
+:is(.vp-doc, .mdi-code) .token.tag,
+:is(.vp-doc, .mdi-code) .token.boolean,
+:is(.vp-doc, .mdi-code) .token.number,
+:is(.vp-doc, .mdi-code) .token.constant,
+:is(.vp-doc, .mdi-code) .token.symbol,
+:is(.vp-doc, .mdi-code) .token.deleted {
+  color: #005cc5;
+}
+
+:is(.vp-doc, .mdi-code) .token.selector,
+:is(.vp-doc, .mdi-code) .token.attr-name,
+:is(.vp-doc, .mdi-code) .token.string,
+:is(.vp-doc, .mdi-code) .token.char,
+:is(.vp-doc, .mdi-code) .token.builtin,
+:is(.vp-doc, .mdi-code) .token.inserted {
+  color: #032f62;
+}
+
+:is(.vp-doc, .mdi-code) .token.operator,
+:is(.vp-doc, .mdi-code) .token.entity,
+:is(.vp-doc, .mdi-code) .token.url {
+  color: #d73a49;
+}
+
+:is(.vp-doc, .mdi-code) .token.atrule,
+:is(.vp-doc, .mdi-code) .token.attr-value,
+:is(.vp-doc, .mdi-code) .token.keyword {
+  color: #d73a49;
+}
+
+:is(.vp-doc, .mdi-code) .token.function,
+:is(.vp-doc, .mdi-code) .token.class-name {
+  color: #6f42c1;
+}
+
+:is(.vp-doc, .mdi-code) .token.regex,
+:is(.vp-doc, .mdi-code) .token.important,
+:is(.vp-doc, .mdi-code) .token.variable {
+  color: #e36209;
+}
+
+.dark :is(.vp-doc, .mdi-code) .token.comment,
+.dark :is(.vp-doc, .mdi-code) .token.prolog,
+.dark :is(.vp-doc, .mdi-code) .token.doctype,
+.dark :is(.vp-doc, .mdi-code) .token.cdata {
+  color: #8b949e;
+}
+
+.dark :is(.vp-doc, .mdi-code) .token.punctuation {
+  color: #c9d1d9;
+}
+
+.dark :is(.vp-doc, .mdi-code) .token.property,
+.dark :is(.vp-doc, .mdi-code) .token.tag,
+.dark :is(.vp-doc, .mdi-code) .token.boolean,
+.dark :is(.vp-doc, .mdi-code) .token.number,
+.dark :is(.vp-doc, .mdi-code) .token.constant,
+.dark :is(.vp-doc, .mdi-code) .token.symbol,
+.dark :is(.vp-doc, .mdi-code) .token.deleted {
+  color: #79c0ff;
+}
+
+.dark :is(.vp-doc, .mdi-code) .token.selector,
+.dark :is(.vp-doc, .mdi-code) .token.attr-name,
+.dark :is(.vp-doc, .mdi-code) .token.string,
+.dark :is(.vp-doc, .mdi-code) .token.char,
+.dark :is(.vp-doc, .mdi-code) .token.builtin,
+.dark :is(.vp-doc, .mdi-code) .token.inserted {
+  color: #a5d6ff;
+}
+
+.dark :is(.vp-doc, .mdi-code) .token.operator,
+.dark :is(.vp-doc, .mdi-code) .token.entity,
+.dark :is(.vp-doc, .mdi-code) .token.url {
+  color: #ff7b72;
+}
+
+.dark :is(.vp-doc, .mdi-code) .token.atrule,
+.dark :is(.vp-doc, .mdi-code) .token.attr-value,
+.dark :is(.vp-doc, .mdi-code) .token.keyword {
+  color: #ff7b72;
+}
+
+.dark :is(.vp-doc, .mdi-code) .token.function,
+.dark :is(.vp-doc, .mdi-code) .token.class-name {
+  color: #d2a8ff;
+}
+
+.dark :is(.vp-doc, .mdi-code) .token.regex,
+.dark :is(.vp-doc, .mdi-code) .token.important,
+.dark :is(.vp-doc, .mdi-code) .token.variable {
+  color: #ffa657;
+}
+
+:is(.vp-doc, .mdi-code) .token.bold {
+  font-weight: 700;
+}
+
+:is(.vp-doc, .mdi-code) .token.italic {
+  font-style: italic;
+}
+
+/* [title] 标题栏骨架 */
+.vp-code-block-title-bar {
+  background-color: var(--vp-code-block-bg);
+  color: var(--vp-code-tab-text-color);
+  white-space: nowrap;
+  box-shadow: inset 0 -1px var(--vp-code-tab-divider);
+  border-radius: 8px 8px 0 0;
+  margin: 1rem -1.5rem 0;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.5s;
+  position: relative;
+  overflow-x: auto;
+}
+.custom-block .vp-code-block-title-bar {
+  margin: 1rem 0 0;
+}
+@media (min-width: 40rem) {
+  .vp-code-block-title-bar {
+    margin: 1rem 0 0;
+  }
+}
+.vp-code-block-title-text {
+  padding: 0 12px;
+  line-height: 48px;
+}
+.vp-code-block-title div[class*='language-'] {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  margin-top: 0 !important;
+}

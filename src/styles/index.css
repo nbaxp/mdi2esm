@@ -1,8 +1,14 @@
-/* mdi2esm 独立使用样式入口：
-   - vars.css  VitePress 颜色/字体/代码变量
-   - icons.css copy / copied / external-link 图标
-   - doc.css   markdown 正文、代码块、custom-block、code-group、行号、页内 outline
-   构建时由 lightningcss 合并为 dist/index.css 与 dist/index.min.css。 */
-@import './vars.css';
-@import './icons.css';
-@import './doc.css';
+/* mdi2esm 独立使用样式入口。
+   官方 VitePress 文件「整文件」引入（node_modules/vitepress/dist/client/theme-default/styles/），
+   由 build.mjs 的 lightningcss bundleAsync 内联为单文件；自定义样式按功能拆分。
+   构建时合并为 dist/index.css 与 dist/index.min.css。 */
+@import 'vitepress/dist/client/theme-default/styles/vars.css';
+@import 'vitepress/dist/client/theme-default/styles/icons.css';
+@import 'vitepress/dist/client/theme-default/styles/components/vp-doc.css';
+@import 'vitepress/dist/client/theme-default/styles/components/custom-block.css';
+@import 'vitepress/dist/client/theme-default/styles/components/vp-code-group.css';
+@import 'vitepress/dist/client/theme-default/styles/utils.css';
+
+@import './vp-doc-reset.css';
+@import './code-block.css';
+@import './vp-badge.css';

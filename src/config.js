@@ -46,6 +46,8 @@ export const DEFAULT_CONFIG = {
     container: [],
     scripts: true,
     frontmatterParser: null,
+    // 图片懒加载：对齐 VitePress，默认禁用，置 true 才给相对路径图片加 loading="lazy"
+    image: { lazyLoad: false },
     // [[toc]]：level 目录层级、showAutoNumber 标题/目录自动编号、allowMultiToc 允许多个目录
     toc: { level: [2, 3], showAutoNumber: false, allowMultiToc: true },
   },
@@ -100,6 +102,7 @@ export function createConfig({ base = '/', adapters, ...overrides } = {}) {
     markdown: {
       ...DEFAULT_CONFIG.markdown,
       ...overrides.markdown,
+      image: { ...DEFAULT_CONFIG.markdown.image, ...overrides.markdown?.image },
       toc: { ...DEFAULT_CONFIG.markdown.toc, ...overrides.markdown?.toc },
     },
     labels: {
@@ -137,6 +140,7 @@ function configFingerprint(config) {
     scripts: md.scripts,
     container: md.container ?? [],
     frontmatterParser: Boolean(md.frontmatterParser),
+    imageLazyLoad: md.image?.lazyLoad,
     tocLevel: md.toc?.level,
     tocShowAutoNumber: md.toc?.showAutoNumber,
     tocAllowMultiToc: md.toc?.allowMultiToc,

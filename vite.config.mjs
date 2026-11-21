@@ -4,7 +4,7 @@
 //   'mdi2esm' 经 alias 落到 src/index.js——引用全是非 dist 内容。
 // - build（scripts/build.mjs 调 JS API）：库构建 + demo 页面构建，同样走这里的别名。
 // - preview（`npm run preview`）：服务 dist——构建后的 demo 已自包含（无 importmap、
-//   无需 node_modules），端口 4180（4173 是 mdoc 的）。
+//   无需 node_modules）。
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -27,12 +27,4 @@ export const createBaseConfig = () => ({
 export default defineConfig({
   ...createBaseConfig(),
   base: './', // demo 以相对路径引资产，gh-pages 任意子路径都能跑
-  server: {
-    port: 4180, // 4173 是 Vite 默认端口，本地常年被 mdoc 占着
-    strictPort: false,
-  },
-  preview: {
-    port: 4180,
-    strictPort: false,
-  },
 });

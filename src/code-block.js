@@ -1,7 +1,7 @@
 // mdi2esm 自身的 fence 渲染：DOM 外壳对齐 VitePress preWrapper（button.copy + span.lang + pre）。
 // 复制与 code-group 切换的点击委托也在这里：文档级一次委托（对齐 VitePress copyCode/codeGroups），
 // 换剪贴板策略或改 tab 行为时改这一个文件即可，宿主零配置。
-import { extractDiffMarks, extractNotationDiff, stripDiffPrefixes, wrapCodeLines } from './code-lines.js';
+import { extractDiffMarks, extractNotation, stripDiffPrefixes, wrapCodeLines } from './code-lines.js';
 import { applyLineNumbers, extractLang, fenceMetaAttrs } from './markdown-plugins.js';
 import { highlightCode, isDiffLang } from './prism.js';
 
@@ -115,7 +115,16 @@ export function applyCodeBlock(md) {
   // 因此高亮可以直接发生在渲染期，不再需要渲染后的 DOM 替换。
   md.options.highlight = (code, lang) => highlightCode(code, lang) ?? md.utils.escapeHtml(code);
 
-  function wrapPre(html, token, env, notationMarks = null, diffMarks = null) {
+  function wrapPre(
+    html,
+    token,
+    env,
+    notationMarks = null,
+    diffMarks = null,
+    focused = false,
+    hasDiff = false,
+    hasHighlighted = false,
+  ) {
     // ```mermaid 转成组件标签：SVG 由组件自己写进 DOM（模板编译会丢 SVG 里的 <style>），
     // 源码 encodeURIComponent 后再进属性，引号和换行不会破坏模板
     if (extractLang(token.info) === 'mermaid') {
@@ -126,6 +135,8 @@ export function applyCodeBlock(md) {
       return `<EChartsBlock code="${encodeURIComponent(token.content)}"></EChartsBlock>\n`;
     }
     const lineMeta = fenceMetaAttrs(token.info);
+    // [标题]：对齐 VitePress preWrapper，先取出再从 info 剥掉；代码组内的标题只作 tab 标签，不渲染标题栏
+    const blockTitle = token.info.match(/\[(.*)\]/)?.[1] ?? '';
     token.info = token.info.replace(/\[.*\]/, '');
     const active = / active( |$)/.test(token.info) ? ' active' : '';
     token.info = token.info.replace(/ active$/, '').replace(/ active /, ' ');
@@ -136,22 +147,35 @@ export function applyCodeBlock(md) {
     const copied = md.utils.escapeHtml(copy.copiedText ?? '');
     const meta = md.utils.escapeHtml(token.info);
     // 行级着色：notation（[!code ++]/--）与 ```diff 共用同一套 .diff 行样式
-    const withLines = wrapCodeLines(stripDiffPrefixes(html), lineMeta, notationMarks ?? diffMarks);
-    return `<div class="language-${lang}${active}" dir="ltr" data-meta="${meta}"><button class="copy" title="${title}" data-copied="${copied}"></button><span class="lang">${label}</span>${withLines}</div>`;
+    // has-diff / has-highlighted 对齐 VitePress 加在 <pre> 上（不是外层 div）
+    const preExtra = [hasDiff && 'has-diff', hasHighlighted && 'has-highlighted', focused && 'has-focused-lines']
+      .filter(Boolean)
+      .join(' ');
+    const withPre = preExtra ? html.replace('<pre v-pre class="shiki"', `<pre v-pre class="shiki ${preExtra}"`) : html;
+    const withLines = wrapCodeLines(stripDiffPrefixes(withPre), lineMeta, notationMarks ?? diffMarks);
+    const block = `<div class="language-${lang}${active}" dir="ltr" data-meta="${meta}"><button class="copy" title="${title}" data-copied="${copied}"></button><span class="lang">${label}</span>${withLines}</div>`;
+    // 代码组内的 fence 已由 createCodeGroupOpenRender 标记，标题只出现在 tab 上
+    if (!blockTitle || token.meta?.codeGroup) return block;
+    const text = md.utils.escapeHtml(blockTitle);
+    return `<div class="vp-code-block-title"><div class="vp-code-block-title-bar"><span class="vp-code-block-title-text" data-title="${text}">${text}</span></div>${block}</div>`;
   }
   const defaultFence = md.renderer.rules.fence;
   md.renderer.rules.fence = (tokens, idx, options, env, self) => {
-    // [!code ++]/-- 在 Prism 高亮前移除：Prism 不会把标记当成注释，行号也按清理后行数对齐
-    const extracted = extractNotationDiff(tokens[idx].content);
+    // [!code ...] 在 Prism 高亮前移除：Prism 不会把标记当成注释，行号也按清理后行数对齐
+    const extracted = extractNotation(tokens[idx].content);
     if (extracted.code !== tokens[idx].content) tokens[idx].content = extracted.code;
     // ```diff / ```diff-xxx：按行首 +/- 生成行级标记（与 notation 共用 .diff 行样式）
     const diffMarks = isDiffLang(extractLang(tokens[idx].info)) ? extractDiffMarks(tokens[idx].content) : null;
+    const hasDiff = extracted.hasDiff || Boolean(diffMarks?.some((mark) => mark != null));
     return wrapPre(
-      defaultFence(tokens, idx, options, env, self).replace('<pre', '<pre v-pre'),
+      defaultFence(tokens, idx, options, env, self).replace('<pre', '<pre v-pre class="shiki"'),
       tokens[idx],
       env,
       extracted.marks,
       diffMarks,
+      extracted.focused,
+      hasDiff,
+      extracted.hasHighlighted,
     );
   };
   const defaultCodeBlock = md.renderer.rules.code_block;

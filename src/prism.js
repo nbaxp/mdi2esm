@@ -55,12 +55,13 @@ const LANG_ALIASES = {
   yml: 'yaml',
 };
 
-// ```ts:no-line-numbers 这类 info 会把标记拼在语言名后，取冒号前的语言名。
+// ```ts:no-line-numbers / ```js{4} 这类 info 会把行号/行高亮标记拼在语言名后，
+// 取冒号或花括号前的语言名（与 VitePress 一致：lang 只取 info 的第一个词）。
 export function normalizeLang(lang) {
   const key = String(lang ?? '')
     .trim()
     .toLowerCase()
-    .split(':')[0];
+    .split(/[{:]/)[0];
   return LANG_ALIASES[key] ?? key;
 }
 
@@ -86,3 +87,49 @@ export function highlightCode(code, lang) {
     return null;
   }
 }
+
+// 复用 VitePress 的 .shiki 机制：token 颜色以 --shiki-light / --shiki-dark 变量输出，
+// 色值取 VitePress 默认 shiki 主题（GitHub Light / Dark），CSS 直接复用 .shiki span 规则。
+const SHIKI_TOKEN_COLORS = {
+  comment: ['#6a737d', '#8b949e'],
+  prolog: ['#6a737d', '#8b949e'],
+  doctype: ['#6a737d', '#8b949e'],
+  cdata: ['#6a737d', '#8b949e'],
+  punctuation: ['#24292f', '#c9d1d9'],
+  namespace: ['#24292f', '#c9d1d9'],
+  property: ['#005cc5', '#79c0ff'],
+  tag: ['#005cc5', '#79c0ff'],
+  boolean: ['#005cc5', '#79c0ff'],
+  number: ['#005cc5', '#79c0ff'],
+  constant: ['#005cc5', '#79c0ff'],
+  symbol: ['#005cc5', '#79c0ff'],
+  deleted: ['#005cc5', '#79c0ff'],
+  selector: ['#032f62', '#a5d6ff'],
+  'attr-name': ['#032f62', '#a5d6ff'],
+  string: ['#032f62', '#a5d6ff'],
+  char: ['#032f62', '#a5d6ff'],
+  builtin: ['#032f62', '#a5d6ff'],
+  inserted: ['#032f62', '#a5d6ff'],
+  operator: ['#d73a49', '#ff7b72'],
+  entity: ['#d73a49', '#ff7b72'],
+  url: ['#d73a49', '#ff7b72'],
+  atrule: ['#d73a49', '#ff7b72'],
+  'attr-value': ['#d73a49', '#ff7b72'],
+  keyword: ['#d73a49', '#ff7b72'],
+  function: ['#6f42c1', '#d2a8ff'],
+  'class-name': ['#6f42c1', '#d2a8ff'],
+  regex: ['#e36209', '#ffa657'],
+  important: ['#e36209', '#ffa657'],
+  variable: ['#e36209', '#ffa657'],
+  // Prism diff 专有类型（```diff / ```diff-xxx）。颜色取自 shiki github-light/dark 主题：
+  // coord → meta.diff.header；deleted-sign/inserted-sign → punctuation.definition.deleted/inserted
+  coord: ['#005cc5', '#79b8ff'],
+  'deleted-sign': ['#b31d28', '#fdaeb7'],
+  'inserted-sign': ['#22863a', '#85e89d'],
+};
+
+Prism.hooks.add('wrap', (env) => {
+  const colors = SHIKI_TOKEN_COLORS[env.type];
+  if (!colors) return;
+  env.attributes.style = `--shiki-light:${colors[0]};--shiki-dark:${colors[1]}`;
+});

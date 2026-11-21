@@ -17,14 +17,6 @@ export const resolvePath = (base, rel) => {
   return out.join('/');
 };
 
-// 外链图标：对齐 VitePress @mdit-vue/plugin-external-link-icon
-const EXTERNAL_ICON_SVG =
-  '<svg class="vp-external-link-icon" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" ' +
-  'focusable="false" viewBox="0 0 100 100" ' +
-  'style="display:inline-block;vertical-align:middle;width:1em;height:1em;margin-left:2px">' +
-  '<path d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path>' +
-  '<polygon points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>';
-
 // include.ts:32 的 rebase marker：被包含 .md 里的相对链接要按被包含文件的目录解析
 const REBASE_RE = /^[ \t]*<!-- @include-(?:start: (.*)|end) -->[ \t]*$/gm;
 
@@ -32,6 +24,8 @@ const REBASE_RE = /^[ \t]*<!-- @include-(?:start: (.*)|end) -->[ \t]*$/gm;
 // URL 拼装与锚点形态交给 config.adapters，渲染层不含任何宿主路径规则
 md.core.ruler.push('link_rewrite', (state) => {
   const adapters = state.env.adapters ?? DEFAULT_ADAPTERS;
+  // 图片懒加载对齐 VitePress：默认禁用，仅 markdown.image.lazyLoad 为 true 时给相对路径图片加
+  const lazyLoad = state.env.config?.markdown?.image?.lazyLoad === true;
   const pageDir = state.env.dir ?? '';
   const stack = [];
   let dir = pageDir;
@@ -57,17 +51,8 @@ md.core.ruler.push('link_rewrite', (state) => {
         if (/^(https?:|mailto:|tel:)/i.test(href)) {
           child.attrSet('target', '_blank');
           child.attrSet('rel', 'noreferrer');
-          if (/^https?:/i.test(href)) {
-            for (let j = ci + 1; j < children.length; j += 1) {
-              if (children[j].type === 'link_close') {
-                const icon = new state.Token('html_inline', '', 0);
-                icon.content = EXTERNAL_ICON_SVG;
-                icon.level = child.level;
-                children.splice(j, 0, icon);
-                break;
-              }
-            }
-          }
+          // 外链图标交给 CSS 层（官方 .external-link-icon-enabled + ::after，默认关闭），
+          // 渲染层不注入图标 DOM，与 VitePress 默认行为一致。
           continue;
         }
         if (href.startsWith('#')) {
@@ -93,7 +78,7 @@ md.core.ruler.push('link_rewrite', (state) => {
         if (/^(https?:|mailto:|#|data:)/i.test(src)) continue;
         const resolved = src.startsWith('/') ? src : resolvePath(dir, src);
         child.attrSet('src', adapters.toSrc({ src, resolved }));
-        child.attrSet('loading', 'lazy');
+        if (lazyLoad) child.attrSet('loading', 'lazy');
       } else if (child.type === 'media') {
         let src = child.attrGet('src') ?? '';
         // 与图片同策略：协议 URL / data 原样，相对路径按 dir 解析后走 toSrc
@@ -126,9 +111,11 @@ export function buildOutline(headings) {
 // markdown → { html, headings }：headings 由官方 anchor 插件的 permalink 回调按出现顺序填充。
 // 围栏保护与 KaTeX 渲染都在内部完成，调用方拿到的就是可挂载的最终 HTML，
 // 不需要也不应该自己再拼 mask / renderMath 这两步。
-export async function renderMarkdown(body, { dir = '', config } = {}) {
+export async function renderMarkdown(body, { dir = '', config, lineMap } = {}) {
   assertConfigCompatible(config);
   const env = createRenderEnv(config, { dir });
+  // lineMap：body 每行对应的原文行号（1-based），供 headings.line 还原
+  if (lineMap) env.lineMap = lineMap;
   ensureCustomContainers(env.config);
   ensureSyntaxPlugins(env.config);
   const html = md.render(maskFenceMarkers(body).replace(IMAGE_SIZE_PRE, '$1=$2)'), env);

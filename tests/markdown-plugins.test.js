@@ -13,7 +13,7 @@ test('官方 anchor 插件：id / .header-anchor / 中文 slug / outline 收集'
     html,
     /<h2 id="小节-abc">小节 abc <a class="header-anchor" href="#小节-abc" aria-label="Permalink to “小节 abc”"><\/a><\/h2>/,
   );
-  assert.deepEqual(headings, [{ level: 2, title: '小节 abc', slug: '小节-abc' }]);
+  assert.deepEqual(headings, [{ level: 2, title: '小节 abc', slug: '小节-abc', line: 1 }]);
 });
 
 test('官方 attrs 插件：{#custom-id} 覆盖自动 slug', async () => {
@@ -68,14 +68,14 @@ test('官方 restoreEntities：裸 & 转义，实体保留给 Vue 编译器解�
   assert.equal(headings[0].title, 'A & B');
 });
 
-test('官方 link/image 规则：外链属性、hash slugify、.md 路由、图片懒加载', async () => {
+test('官方 link/image 规则：外链属性、hash slugify、.md 路由、图片不加默认 lazy', async () => {
   const { html } = await renderMarkdown(
     '[外链](https://example.com)\n\n[锚](#小节%20abc)\n\n[文档](./foo.md#小节%20abc)\n\n![图](./a.png)',
   );
   assert.match(html, /<a href="https:\/\/example.com" target="_blank" rel="noreferrer">外链/);
   assert.match(html, /<a href="#小节-abc">锚<\/a>/);
   assert.match(html, /href="[^"]*foo#小节-abc"/);
-  assert.match(html, /<img[^>]*loading="lazy"/);
+  assert.ok(!/loading="lazy"/.test(html));
 });
 
 test('normalizeHash 与 anchor 共用 slugify', () => {

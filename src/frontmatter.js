@@ -133,13 +133,15 @@ export function parseFrontmatter(raw) {
   const lines = source.split('\n');
   const end = frontmatterEnd(lines);
   const body = end < 0 ? source : lines.slice(end + 1).join('\n');
-  if (end < 0) return { body, data: {} };
+  // bodyLine：body 首行在原文中的行号（1-based）。frontmatter 占 end+1 行
+  const bodyLine = end < 0 ? 1 : end + 2;
+  if (end < 0) return { body, data: {}, bodyLine };
 
   const block = lines.slice(1, end).map((line) => line.replace(/\r$/, ''));
   try {
-    return { body, data: parseBlock(block, 0, 0).value };
+    return { body, data: parseBlock(block, 0, 0).value, bodyLine };
   } catch {
     // 解析失败不影响正文渲染
-    return { body, data: {} };
+    return { body, data: {}, bodyLine };
   }
 }

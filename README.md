@@ -3,151 +3,11 @@ title: mdi2esm
 description: markdown-it 封装与 Vue 组件管线，一个文件演示全部 Markdown 能力
 ---
 
-<script setup>
-const greeting = '你好，mdi2esm'
-</script>
-
 # mdi2esm
 
 A markdown-it wrapper with common plugins integrated. It renders Markdown into VitePress-style HTML, with code highlighting, math (KaTeX), Mermaid diagrams, ECharts charts, outlines and image zoom built in. The core markdown stack and Prism are bundled into a single browser-ready ESM artifact; framework and heavy dependencies are left as peers for the host to provide.
 
-> 这份 README 就是 demo 的渲染源：左侧可实时编辑，右侧渲染。它同时是包文档和能力全景——基础语法、容器、GitHub alerts、脚注、任务列表、图标与 emoji 短码、CJK 混排、属性、目录、代码高亮、数学、图表（含表格转图表）、图片缩放，以及宿主注入的组件（`<Badge>` / `<Icon>`）和 `<script setup>`。
-
-::: tip 关于这份文档
-顶部有 frontmatter（`title` / `description`）和一个 `<script setup>`，都由库的渲染管线处理（`createMarkdownComponent` 内部走的就是它）。下面的 `{{ greeting }}` 就是 setup 里定义的变量：**{{ greeting }}**。
-:::
-
-## Mermaid 图表
-
-```mermaid
-graph TD
-  A[开始] --> B{判断}
-  B -->|是| C[结束]
-  B -->|否| A
-```
-
-默认由 **Pele** 渲染，可通过 `createConfig({ mermaidDriver: 'mermaid' })` 切回 Mermaid；可选值只有 `pele` 和 `mermaid`，没有自动回退模式。demo 顶部可以直接切换并对比同一图源。
-
-点击右上角"深色"按钮切换主题：Pele 通过 CSS 变量换色，Mermaid 会随 `html.dark` 自动重绘。
-
-围栏会被渲染成 `<MermaidBlock graph="…">`（源码经 `encodeURIComponent` 传入），图形由该组件在自身挂载后写入自己的根节点，不查 document，页面上有几份 Markdown 互不干扰。`pele` 和 `mermaid` 都是动态 `import()`，没有图表就不会加载，未选中的驱动也不会加载。`pele` 的 `--pele-*` 配色变量由组件内联从 `--vp-*` 派生，宿主不引包内 CSS（如只引 JS 的宿主）也能随暗色主题切换。
-
-## ECharts 图表
-
-```echarts
-{
-  title: {
-    text: '利用代码块直接渲染'
-  },
-  tooltip: {
-    trigger: 'axis',
-    axisPointer: {
-      type: 'cross',
-      label: {
-        backgroundColor: '#6a7985'
-      }
-    }
-  },
-  legend: {
-    data: ['Email', 'Union Ads', 'Video Ads', 'Direct', 'Search Engine']
-  },
-  toolbox: {
-    feature: {
-      saveAsImage: {}
-    }
-  },
-  xAxis: [
-    {
-      type: 'category',
-      boundaryGap: false,
-      data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    }
-  ],
-  yAxis: [
-    {
-      type: 'value'
-    }
-  ],
-  series: [
-    {
-      name: 'Email',
-      type: 'line',
-      stack: 'Total',
-      areaStyle: {},
-      emphasis: {
-        focus: 'series'
-      },
-      data: [120, 132, 101, 134, 90, 230, 210]
-    },
-    {
-      name: 'Union Ads',
-      type: 'line',
-      stack: 'Total',
-      areaStyle: {},
-      emphasis: {
-        focus: 'series'
-      },
-      data: [220, 182, 191, 234, 290, 330, 310]
-    },
-    {
-      name: 'Video Ads',
-      type: 'line',
-      stack: 'Total',
-      areaStyle: {},
-      emphasis: {
-        focus: 'series'
-      },
-      data: [150, 232, 201, 154, 190, 330, 410]
-    },
-    {
-      name: 'Direct',
-      type: 'line',
-      stack: 'Total',
-      areaStyle: {},
-      emphasis: {
-        focus: 'series'
-      },
-      data: [320, 332, 301, 334, 390, 330, 320]
-    },
-    {
-      name: 'Search Engine',
-      type: 'line',
-      stack: 'Total',
-      label: {
-        show: true,
-        position: 'top'
-      },
-      areaStyle: {},
-      emphasis: {
-        focus: 'series'
-      },
-      data: [820, 932, 901, 934, 1290, 1330, 1320]
-    }
-  ]
-};
-```
-
-`echarts` 围栏的内容是 **ECharts option（JS 对象字面量，可含函数）**，渲染成 `<EChartsBlock code="…">`（同样 `encodeURIComponent` 进属性），组件用 Blob URL 动态 `import()` 求值（与 `<script>` 同一机制）后 `echarts.init` + `setOption` 画在自己的根节点上。echarts 是**可选 peer**（`^6.1.0`）：动态 `import()`，未安装或加载失败时降级为源码 `<pre class="echarts-source">` 并 `console.warn`；`npm i echarts` 即可启用。
-
-- option 是 JS 字面量，**可含函数**（`formatter` 等），直接粘贴 ECharts 官方示例即可；经 Blob URL 执行，宿主 CSP 需允许 `blob:`（与 `<script>` 相同）。
-
-- 高度默认 400px，`createConfig({ echarts: { height: 500 } })` 调整。
-- 随 `html.dark` 切换暗色主题（重建实例）、容器尺寸变化 `resize()`、组件卸载 `dispose()`。
-- option 解析/执行失败或 `setOption` 抛错时降级显示源码 + 错误信息，不留空白。
-- 库产物把 echarts 外部化，由宿主打包器或 importmap 提供；demo 构建会把它打进去。
-
-## 表格转图表
-
-表格首格写图表声明（`:类型:` 可跟 `{...}` option），表格即渲染为图表，图表在上、原表格保留在下：
-
-| :line: {title: {text: '季度销量'}} | Q1  | Q2  | Q3  |
-| ---------------------------------- | --- | --- | --- |
-| 产品A                              | 120 | 132 | 101 |
-| 产品B                              | 220 | 182 | 191 |
-
-- 类型名就是 ECharts 系列类型：`line` / `bar` / `pie` / `radar` / `scatter` / `funnel` 等，`{...}` 是 option 的 **JS 对象字面量**（可含函数，与 `echarts` 围栏同一套解析），不写默认 `{}`。
-- 数据映射：通用类型把表头作类目轴、每行一个 series（首列是系列名）；`pie` / `funnel` 取前两列（名称 / 数值）；`radar` 取表头作 indicator。
-- 高度沿用 `createConfig({ echarts: { height } })`；echarts 未安装或 option 解析失败时降级为源码卡片，原表格不受影响。
+> 这份 README 是包文档；可编辑的能力演示在同目录 `demo.md`，demo 运行时渲染的就是它。基础语法、容器、GitHub alerts、脚注、任务列表、图标与 emoji 短码、CJK 混排、属性、目录、代码高亮、数学、图表（含表格转图表）、图片缩放，以及宿主注入的组件（`<Badge>` / `<Icon>`）和 `<script setup>` 都在 `demo.md` 里。
 
 ## 环境要求
 
@@ -198,7 +58,7 @@ const config = createConfig({
 });
 
 // 1. 取源文本：库只吃字符串，跟构建工具无关——fetch、接口返回、textarea 内容都行
-const source = await fetch('./README.md').then((res) => res.text());
+const source = await fetch('./demo.md').then((res) => res.text());
 
 // 2. markdown → 组件：frontmatter、Prism 高亮、KaTeX、<script setup> 都在内部处理
 const { component, headings } = await createMarkdownComponent(source, '', config);
@@ -216,7 +76,7 @@ createApp({ render: () => h(component) }).mount(document.getElementById('content
 
 只要 HTML 字符串、不需要 Vue 组件时，用上面第一节的 `renderMarkdown`——两者的区别只在于要不要把结果挂成组件。
 
-`index.html` 里取源文本就是一句 `fetch('./README.md')`——库只吃字符串，文本从哪来跟它无关，`fetch`、接口返回、`textarea` 内容都一样。
+`index.html` 里取源文本就是一句 `fetch('./demo.md')`——库只吃字符串，文本从哪来跟它无关，`fetch`、接口返回、`textarea` 内容都一样。
 
 `package.json` 的 `exports`：`.`（默认/生产 → `dist/index.min.js`，`development` → `dist/index.js`），显式 JS 入口 `mdi2esm/index`、`mdi2esm/index.min`，样式入口 `mdi2esm/index.css`、`mdi2esm/index.min.css`。
 
@@ -246,7 +106,7 @@ createApp({ render: () => h(component) }).mount(document.getElementById('content
     template: '<span class="badge" :data-type="type"><slot>{{ text }}</slot></span>',
   };
 
-  const source = await fetch('./README.md').then((res) => res.text());
+  const source = await fetch('./demo.md').then((res) => res.text());
   const config = createConfig();
 
   // 运行时编译，和打包场景一样
@@ -269,7 +129,7 @@ createApp({ render: () => h(component) }).mount(document.getElementById('content
 本仓库的 demo 在 `index.html`（整页自包含：骨架、内联样式、内联脚本——宿主组件 `VPBadge` 与左编辑右预览逻辑都在里面），由 Vite 接管两种运行方式：
 
 - `npm run dev`：Vite 服务根目录 `index.html`，内联脚本里的裸导入由 Vite 重写到**源码**（`mdi2esm` 经 `vite.config.mjs` 的 alias 指到 `src/index.js`）——改 src 立即生效。
-- `npm run build && npm run preview`：build 把 `index.html` 当入口打进 `dist/`，所有导入解析成打包产物，**dist 自包含**——整个目录发布到 GitHub Pages（或任意静态托管）就能直接演示，无 importmap、无 node_modules 依赖；`vite preview` 服务 dist（4180 端口）。
+- `npm run build && npm run preview`：build 把 `index.html` 当入口打进 `dist/`，所有导入解析成打包产物，**dist 自包含**——整个目录发布到 GitHub Pages（或任意静态托管）就能直接演示，无 importmap、无 node_modules 依赖；`vite preview` 服务 dist。
 
 推 `v*` Tag 时 GitHub Actions（`.github/workflows/publish.yml` 的 `pages` job）会构建并把 dist 部署到 `gh-pages` 分支（仓库 Pages 源需指向 gh-pages / root）。
 
@@ -304,7 +164,7 @@ KaTeX 的样式不属于路径配置，库也不注入 `<link>`：`katex/dist/ka
 
 ## 样式
 
-渲染产物的类名沿用 VitePress 风格（`.vp-doc`、`.custom-block` 等）。包内附带一套只覆盖 markdown 正文与页内目录（`.vp-doc`、`.vp-doc-outline`）的样式：
+渲染产物的类名沿用 VitePress 风格（`.vp-doc`、`.custom-block` 等）。包内附带一套只覆盖渲染产物（`.vp-doc` 及 `.custom-block`、`.VPBadge` 等类名）的样式：
 
 ```js
 import 'mdi2esm/index.min.css';
@@ -322,9 +182,7 @@ import 'katex/dist/katex.min.css';
 
 ## 目录
 
-[[toc]]
-
-正文的 `[[toc]]` 自动生成上面的目录（`.table-of-contents`，卡片式、按层级缩进）。右侧“大纲”栏由 `buildOutline(headings)` 从 h2–h6 生成，两者互相独立，见下面的「大纲」。
+正文里的 `[[toc]]` 生成 `.table-of-contents`（卡片式、按层级缩进），实例见 `demo.md`。右侧“大纲”栏由 `buildOutline(headings)` 从 h2–h6 生成，两者互相独立，见下面的「大纲」。
 
 目录行为由 `createConfig({ markdown: { toc } })` 配置：
 
@@ -333,180 +191,6 @@ import 'katex/dist/katex.min.css';
 - `allowMultiToc`：是否允许多个 `[[toc]]`，默认 `true`；设为 `false` 时只渲染第一个，其余忽略并 `console.warn`。
 
 demo 顶部提供这三个配置的开关（编号 / 多目录 / 层级），改动经 URL 参数写入并重新加载生效——`md` 是模块级单例，配置在首次渲染时锁定，运行中切换不生效。
-
-## 基础语法
-
-普通段落，支持 **加粗**、_斜体_、~~删除线~~、`行内代码`，以及 [外部链接](https://example.com) 和 [邮件](mailto:a@example.com)。
-
-> 这是一段引用。
-> 引用可以有多行。
-
-- 无序列表项 A
-- 无序列表项 B
-  - 嵌套项 B1
-
-1. 有序列表项一
-2. 有序列表项二
-
----
-
-| 能力       | 说明                             |
-| ---------- | -------------------------------- |
-| 表格可滚动 | 表格带 `tabindex="0"`            |
-| 实体还原   | 裸 `&` 转 `&amp;`，`&copy;` 保留 |
-
-A & B &copy; C，裸域名 example.com 不会自动成链（`fuzzyLink: false`）。
-
-## 自定义容器
-
-八种内置容器，支持自定义标题、`{no-title}`、`{open}`：
-
-::: info
-默认标题的 info 容器。
-:::
-
-::: note 这是自定义标题
-note 容器，标题写在类型后面。
-:::
-
-::: important
-重要提示。
-:::
-
-::: caution
-小心操作。
-:::
-
-::: warning 无标题示例 {no-title}
-本容器用了 `{no-title}`，不渲染标题栏。
-:::
-
-::: details 点击展开（默认折叠）
-折叠内容，支持 **Markdown**。
-:::
-
-::: details 默认展开 {open}
-本容器带 `{open}`，打开页面即展开。
-:::
-
-::: danger
-危险操作警告。
-:::
-
-内置容器写死在包里；自定义容器需要宿主在 `createConfig` 里声明，再用 `::: 类型名` 触发：
-
-```js
-const config = createConfig({
-  // type 是触发词，title 是默认标题；正文里写 `::: demo 别的标题` 会覆盖它
-  markdown: { container: [{ type: 'demo', title: '自定义容器' }] },
-});
-```
-
-`type` 不能与内置八种重名（会抛错）。本页的 `demo` 容器就是这么来的：
-
-::: demo
-这是一个**自定义容器**类型 `demo`，不属于内置八种；在 GitHub 上它显示为普通文本。
-:::
-
-库只负责产出 `<div class="demo custom-block">` 这个结构，**配色不由库提供**——内置八种有各自的 `--vp-c-*` 色板，未知类型的 `.demo` 只是 `border: 1px solid transparent` 加圆角和内边距，不写 CSS 就看不出来（像上面这段在纯库样式下是个透明块）。要它像容器，宿主自己补一条：
-
-```css
-.vp-doc .custom-block.demo {
-  border-color: var(--vp-c-brand-1);
-  background-color: var(--vp-c-brand-soft);
-}
-.vp-doc .custom-block.demo .custom-block-title {
-  color: var(--vp-c-brand-1);
-}
-```
-
-本页看到的就是加了这段之后的效果（`index.html` 内联样式末尾）。想验证裸效果：先把上面两条 CSS 注释掉，块会变成与正文无异的白板。
-
-## GitHub Alerts
-
-用 `> [!TYPE]` 语法，渲染成与自定义容器同款 block：
-
-> [!TIP]
-> 这是一条 TIP alert。
-
-> [!NOTE] 带标题的 NOTE
-> 标题写在类型后面。
-
-> [!WARNING]
-> 这是一条 WARNING alert。
-
-## 任务列表
-
-- [x] 已完成：标题锚点
-- [x] 已完成：代码高亮
-- [ ] 待办：阅读本文
-- [ ] 待办：试试编辑左侧源码
-
-## 脚注
-
-正文里的脚注引用[^1]，以及行内脚注^[这是行内脚注内容]。
-
-[^1]: 这是脚注定义，可以包含 **Markdown**。
-
-## 短码（图标 / Emoji）
-
-行内图标短码输出**组件标签**，组件由宿主注入；emoji 则交给 markdown-it-emoji 插件：
-
-| 写法            | 输出                        | 说明                                        |
-| --------------- | --------------------------- | ------------------------------------------- |
-| `:i-集合-名字:` | `<Icon icon="集合:名字" />` | `i-` 是固定前缀，第一段是集合，其余是图标名 |
-| `:名字:`        | 对应的 emoji 字符           | 由 markdown-it-emoji（full 数据）渲染，见下 |
-
-- **emoji 不内置**：库动态 `import('markdown-it-emoji')`（full 数据，GitHub / VitePress 同套），宿主提供了就启用；没装时静默回退，`:名字:` 按普通文本原样保留。demo 已装该包，demo 构建会把它打进 `dist`；库产物仍将它外部化，npm 包消费者需自行安装（可选 peer）。
-- **图标规则不受影响**：`:i-mdi-home:` 翻成 `<Icon>`；`:i-foo:` 这种形状不完整的保持原文，不会被 emoji 接走。
-- **不误判**：`12:30:00`、`1:2:3` 这类时间和版本号不在 emoji 短码表里，原样保留。
-- 代码块与行内代码里不生效（markdown-it 自身隔离）。
-
-实际效果：图标 :i-logos-vite: :i-lucide-rocket: ｜ emoji :smile: :tada: :+1: :heart: :rocket: :100: ｜ 原样保留：12:30:00、1:2:3、:i-foo:。
-
-CJK friendly：这是**中文**加粗English混排，数字123与汉字相邻，无需手动加空格即可正确解析强调标记。
-
-```md
-短码：:i-lucide-rocket: ｜ emoji：:smile: :tada: :+1: :100:
-```
-
-## 图标（Iconify）
-
-包内不提供 `<Icon>` 组件，也不自动引入 `@iconify/vue`。宿主把 `Icon` 注入到 Vue 之后，md 里就能直接写：
-
-```md
-<Icon icon="logos:vite" width="24" height="24" />
-<Icon icon="lucide:rocket" />
-```
-
-短码与原始标签等价，要控制尺寸、颜色时用后者：<Icon icon="logos:vite" width="28" height="28" /> <Icon icon="skill-icons:typescript" width="28" height="28" /> <Icon icon="lucide:rocket" width="28" height="28" />
-
-这几个都靠联网获取（Iconify 默认 API），离线、内网或集合不存在时留空，需要离线就按下面注册。怎么注入见「组件接入」——mdi2esm 不持有图标实例，就不会把「`@iconify/vue` 必须单实例」变成宿主的默认约束；宿主用哪个版本、哪个图标集完全自己决定。
-
-包内不内置图标集，也不注册图标数据。未注册的图标由 Iconify 默认 API `api.iconify.design` 联网获取，离线、内网或无此图标时会留空。需要离线渲染时，安装 `@iconify-json/*`，用 Iconify 官方的 `addCollection` / `addIcon` 注册（对宿主的 `<Icon>` 直接生效，后注册也有效，Iconify 会通知已渲染的图标重绘）：
-
-```js
-import { addCollection, addIcon } from '@iconify/vue';
-import { icons } from '@iconify-json/lucide';
-
-addCollection(icons); // 整个集合
-addIcon('my:star', { body: '<path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11z"/>', width: 24, height: 24 });
-```
-
-需自行安装 `@iconify/vue`（可选 peer），并保证它作为外部依赖只保留一份，打包器场景要显式去重：
-
-```js
-// Vite
-export default { resolve: { dedupe: ['@iconify/vue'] } };
-
-// Rollup
-nodeResolve({ dedupe: ['@iconify/vue'] });
-
-// webpack
-resolve: { alias: { '@iconify/vue': path.resolve('node_modules/@iconify/vue') } };
-```
-
-再用 `npm ls @iconify/vue` 或 `npm dedupe` 确认依赖树只有一份。判断是否出现双实例：注册后 `getIcon('lucide:rocket')` 有值，但页面上的 `<Icon icon="lucide:rocket">` 仍然请求网络或空白，基本就是两份模块实例。
 
 ## 组件接入（Vue）
 
@@ -533,222 +217,9 @@ component.components = { ...component.components, Icon, Badge: VPBadge };
 
 两者不要混用；`<Icon>` 只要能被模板解析到即可，与图标数据注册（`addCollection` / `addIcon`）是两回事——后者是往图标仓库塞 svg，和组件注入互不影响。
 
-### 在 Markdown 中使用 Vue
-
-Markdown 最终被编译成 Vue 模板，所以插值、指令和组件都能直接使用（与 VitePress 一致）；前提是走 `createMarkdownComponent`（会把 md 编成模板再渲染），纯 `renderMarkdown` 只出 HTML 字符串。
-
-**插值**：1 + 1 = {{ 1 + 1 }}。
-
-**指令**（原始 HTML 在 Markdown 中同样有效）：
-
-<span v-for="i in 3" :key="i" style="margin-right: 6px;">{{ i }}</span>
-
-**转义**：用 `v-pre` 让插值保持字面量 —— <span v-pre>{{ 这里不会被编译 }}</span>
-
-**组件**：`<Badge>` 见下一节；组件名请用 PascalCase 或带连字符，否则会被当成行内元素包进 `<p>`。
-
-**脚本**：根级 `<script setup>` 可用，变量会注入模板（本页顶部就有），见「脚本能力」。相对路径的 `import` 由宿主适配器解析，裸包名交给 importmap。
-
-### 宿主注入的组件（Badge / Icon）
-
-徽标由宿主提供（`index.html` 内联定义 `VPBadge`），每个徽标独占一段，避免被 markdown-it 当成嵌套标签：
-
-<Badge text="new" type="tip"></Badge>
-
-<Badge text="beta" type="warning"></Badge>
-
-<Badge type="danger">插槽内容</Badge>
-
-`<Badge>` 支持 `text` / `type` 与默认插槽。这类 HTML-in-Markdown 需要 Vue 运行时，纯 `renderMarkdown` + `innerHTML` 的挂载方式无法演示。
-
-## 属性语法与标题锚点
-
-带属性的标题 {#custom-heading .my-class}
-
-把鼠标移到上面的标题，可见自动生成的锚点（`.header-anchor`）；`{#custom-heading}` 覆盖默认 slug，`.my-class` 作为类名挂到标题上。普通文本里的 **加粗**{.highlight} 也能加属性。
-
-## 代码高亮
-
-### 语法着色与行高亮
-
-```js [示例.js] {1,3} :line-numbers=2
-const a = 1;
-const b = 2;
-const c = 3;
-const d = 4;
-const e = 5;
-```
-
-`[示例.js]` 给代码块加标题，`{1,3}` 高亮指定行，`:line-numbers=2` 从第 2 行开始编号。
-
-### Diff 高亮
-
-标准 Git Diff 写法（`diff` 以及 `diff-语言`）由 Prism 的 diff 语法高亮，增删行按行首 `+` / `-` 整行标色，与 notation 共用同一套 `.diff` 行样式：
-
-```diff
---- a/x.js
-+++ b/x.js
-@@ -1,3 +1,3 @@
- const a = 1;
--const b = 2;
-+const b = 3;
-```
-
-`diff-语言`（如 `diff-js`）在未注册对应语法时按 diff 语法高亮：
-
-```diff-js
-+const a = 1;
--const b = 2;
-```
-
-同时兼容 VitePress 的行尾标记 `[!code ++]` / `[!code --]`：标记与注释一并移除，整行加背景色。
-
-```js
-const a = 1; // [!code ++]
-const b = 2; // [!code --]
-```
-
-### 代码组（多 Tab）
-
-::: code-group
-
-```js [npm]
-npm i mdi2esm
-```
-
-```pnpm [pnpm]
-pnpm add mdi2esm
-```
-
-```yarn [yarn]
-yarn add mdi2esm
-```
-
-:::
-
-点击 Tab 可切换代码块。
-
-### 关闭行号
-
-```ts:no-line-numbers
-const plain = true
-```
-
-### 语言覆盖
-
-代码块支持 TIOBE 前 20 中 Prism 有语法的部分（Scratch 除外），再加上文档常用语言：`python` `c` `cpp` `java` `csharp` `javascript` `visual-basic` `go` `sql` `pascal`（Delphi）`fortran` `r` `rust` `php` `matlab` `kotlin` `ruby` `swift` `nasm`（汇编），以及 `bash` `batch` `diff` `docker` `ini` `json` `markdown` `nginx` `powershell` `typescript` `yaml`；`markup`（html/xml/svg）、`css`、`clike` 由 Prism 核心自带。别名如 `c++`、`c#`、`delphi`、`vb`、`asm`、`sh`、`yml`、`md`、`vue` 会自动归一化。
-
-## 数学公式（KaTeX）
-
-行内公式 $E = mc^2$，块级公式：
-
-$$
-\int_0^1 x^2 \, dx = \frac{1}{3}
-$$
-
-段落内联 `$$a+b$$` 按块级处理；价格 \\$5 不会被误当成公式。公式由 `renderMarkdown` 内部异步渲染，样式需宿主引入 `katex/dist/katex.min.css`。
-
-## 图片与缩放
-
-![可点击放大的图片](public/sample-banner.svg)
-
-[![被链接包裹的图片（不启用缩放）](public/sample-thumb.svg)](https://example.com)
-
-点击第一张图片可用 medium-zoom 放大（图为本地资源，离线也能显示）；被链接包裹的图片按规则排除缩放。图片还被自动加上 `loading="lazy"`。
-
-复制按钮、code-group 切 tab、图片缩放这些交互**由库自带**：复制与切 tab 是文档级的一次 click 委托（对齐 VitePress 的 copyCode/codeGroups），缩放由组件挂载后动态 `import('medium-zoom')` 装配（仅当正文有可放大图片；未安装 medium-zoom 时静默跳过）。宿主零配置；要换剪贴板策略或缩放库时才需要自己在宿主侧接管。
-
-## 音视频
-
-!video[MDN 示例视频](https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4)
-
-!audio[示例音频](https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3)
-
-`!video[标题](url)` / `!audio[标题](url)` 渲染为原生 `<video controls>` / `<audio controls>`，标题作为 `title` 属性与回退文本，无额外依赖、浏览器原生播放。URL 策略与图片一致：相对路径按当前文档 `dir` 解析并经 `adapters.toSrc` 加 `base` 前缀，`http(s)` / `data:` 原样保留；`@include` 被包含文件里的媒体同样按其所在目录解析。
-
-## 时间线
-
-:::timeline 发展历程
-:: [milestone] 2021-07 项目开源
-mdi2esm 正式开源
-:: [done] 2024-05 支持流式增量渲染
-提供**流式**渲染的[包](https://example.com/pkg)
-:: [doing] 持续迭代
-
-- 丰富语法生态
-- 持续修复反馈
-  :: [todo] 拥抱社区
-  欢迎贡献
-  :: [error] VSCode 插件
-  对齐主仓
-  :::
-
-`:::timeline [标题]` 声明容器，内部用独占一行的 `::` 分隔节点；节点首行 `[状态] [日期] 标题`（日期可省），其后为描述（按普通 markdown 渲染，链接/图片同样走 `dir` 重写）。状态修饰符：`done`（`x`/`✓`）、`doing`（`~`/`…`）、`todo`（默认，`[ ]`/`[]`）、`milestone`（`*`/`★`）、`error`（`!`/`×`）。未闭合的 `:::timeline` 不渲染为时间线（交回普通 markdown）。
-
-## 脚本能力（script setup）
-
-根级 `<script setup>` 由管线编译进组件，变量可直接在正文插值——本页顶部的 `greeting` 渲染出来是：**{{ greeting }}**。相对路径的 `import` 走宿主的 `toScriptImport` 适配器，裸包名交给 importmap。
-
-普通 `<script>` 也可以写，用来挂生命周期：
-
-<script>
-export default {
-  mounted() {
-    console.log('[mdi2esm demo] 文档组件已挂载')
-  }
-}
-</script>
-
-**只支持一个顶层 `<script>`**：`<script setup>` 与普通 `<script>` 互斥，不能并存；第二个及以后的 `<script>` 会留在正文（作为原始 HTML 输出，不执行）。
-
-脚本能力的安全与限制：
-
-- **只应在可信源启用**：`<script>` / `<script setup>` 会执行作者代码；不可信内容请设 `createConfig({ markdown: { scripts: false } })`（不提取也不执行），或宿主前置剥离。
-- **CSP**：脚本模块经 `blob:` URL 动态 `import()` 执行，需要 `script-src blob:`；`createMarkdownComponent` 的运行时模板编译与插值检测需要 `unsafe-eval`，严格 CSP 下会失败/降级。
-- **import 支持**：仅行首单行 `import ... from '...'` 与 side-effect `import '...'`；多行 import、`import type`、动态 `import()`、`import.meta` 不被改写（相对说明符在 Blob 模块中会失败）。复杂脚本建议宿主预处理器处理。
-- **params 非响应式**：`params` / `frontmatter` 在组件创建时注入，之后变化不会更新，需要重建组件。
-
-## 语法糖与 frontmatter
-
-三条常用内联语法默认开启，可在 `config.markdown` 里关掉：
-
-```md
-==高亮== → <mark>高亮</mark>
-H~2~O → H<sub>2</sub>O
-x^2^ → x<sup>2</sup>
-```
-
-- `==高亮==` → ==高亮==
-- `H~2~O` → H~2~O
-- `x^2^` → x^2^
-
-```js
-createConfig({ markdown: { mark: false, sub: false, sup: false } });
-```
-
-开关按 `md` 实例生效（首次渲染前应用），同一进程不支持多套配置共存；代码块与行内代码里不会生效（`==高亮==`、`H~2~O`），行内脚注 `^[注释]` 与上标规则不冲突。
-
-frontmatter 会被解析并挂到 `$frontmatter`，所以本页可以直接取值：**{{ $frontmatter.title }}**，描述是：{{ $frontmatter.description }}。内置解析器只支持 YAML 子集（标量、一层嵌套、数组、行内数组）：
-
-```md
----
-title: 快速开始
-order: 3
-aside: [toc]
----
-```
-
-```js
-// 需要完整 YAML（多行块、锚点等）时替换解析器，返回 { body, data }
-createConfig({ markdown: { frontmatterParser: (raw) => yamlFrontmatter(raw) } });
-
-// 宿主已解析好时直接传入，不会重复解析
-createMarkdownComponent(source, dir, config, { frontmatter: page.fm });
-```
-
 ## 大纲
 
-右侧“大纲”栏由 `buildOutline(headings)` 从本页 h2–h6 生成，试试增删二级/三级标题，大纲会同步更新。它的尺寸、层级与状态取值与 VitePress 的 `VPDocAsideOutline` / `VPDocOutlineItem` 一致：1px 发丝线、1rem 内缩、链接 14px / 行高 2.2857143、当前项取 `--vp-c-text-1`，另带图样相同的 2px `.outline-marker`。
+右侧“大纲”栏由 `buildOutline(headings)` 从渲染源（`demo.md`）的 h2–h6 生成，在 demo 里增删二级/三级标题可以看到它同步更新。它的尺寸、层级与状态取值与 VitePress 的 `VPDocAsideOutline` / `VPDocOutlineItem` 一致：1px 发丝线、1rem 内缩、链接 14px / 行高 2.2857143、当前项取 `--vp-c-text-1`，另带图样相同的 2px `.outline-marker`。
 
 当前项由宿主做滚动同步：给链接加 `.active`（或 `aria-current="location"`），并把 `.outline-marker` 的 `top`、`opacity` 设到对应位置；demo 实现见 `index.html` 的内联脚本。
 
@@ -789,13 +260,13 @@ const { html, lang, ok } = highlightBlock(code, 'ts', { meta: '{2,4-5}' });
 npm install          # 安装依赖
 npm run build        # dist/index.js、dist/index.min.js、两份 CSS，外加 Vite 构建的自包含 demo（index.html + assets、public/、demo.md）
 npm run dev          # Vite 开发服务（根目录 index.html，引用 src 源码，改源码即时生效）
-npm run build && npm run preview    # 构建后预览 dist（http://127.0.0.1:4180）
+npm run build && npm run preview    # 构建后预览 dist（http://127.0.0.1:4173）
 npm test             # 运行 node:test 测试
 npm run lint         # eslint 检查（--max-warnings 0）
 npm run lint:fix     # eslint 自动修复
 ```
 
-demo 只有这一种形态，整页自包含：`index.html` 一个文件集齐骨架、内联样式（宿主侧 `.vp-doc` 外壳）、内联脚本（宿主组件 `VPBadge` + 左编辑右预览逻辑）。dev 由 Vite 重写裸导入直跑源码；build 由 Vite 打进 `dist/`（所有依赖含 mermaid 异步 chunk、KaTeX 字体都在产物里），preview 与 GitHub Pages 消费的同一份产物。渲染源是包文档 README.md（构建时拷成 `dist/demo.md`，运行时 `fetch`——换名是为了不让 `files` 白名单把 dist 里的示例源带进 npm 包），改 README 要重新 `npm run build`。左列 textarea 编辑（输入防抖 400ms 实时预览），右列渲染结果，最右是大纲。
+demo 只有这一种形态，整页自包含：`index.html` 一个文件集齐骨架、内联样式（宿主侧 `.vp-doc` 外壳）、内联脚本（宿主组件 `VPBadge` + 左编辑右预览逻辑）。dev 由 Vite 重写裸导入直跑源码；build 由 Vite 打进 `dist/`（所有依赖含 mermaid 异步 chunk、KaTeX 字体都在产物里），preview 与 GitHub Pages 消费的同一份产物。渲染源是仓库根目录的 `demo.md`（构建时拷成 `dist/demo.md`，运行时 `fetch`——换名是为了不让 `files` 白名单把 dist 里的示例源带进 npm 包），改 `demo.md` 要重新 `npm run build`。左列 textarea 编辑（输入防抖 400ms 实时预览），右列渲染结果，最右是大纲。
 
 `npm run build` 由 `scripts/build.mjs` 驱动：先用 Vite 8（rolldown）产出库文件 `dist/index.js` / `dist/index.min.js` 与两份 CSS，再把同一份源码打进自包含 demo（`dist/index.html` + `assets/`、`public/`、`demo.md`）。宿主项目可以直接 `import 'mdi2esm'` 交给打包器处理；不打包时也可用 import map 手动映射 peer，见「不打包：浏览器原生 ESM + importmap」。
 

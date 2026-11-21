@@ -11,7 +11,7 @@ test('highlightBlock 输出 pre > code 并带 language- 类名', () => {
   assert.equal(ok, true);
   // lang 为归一化后的入参名，与 Prism 注册的别名一致
   assert.equal(lang, 'ts');
-  assert.match(html, /^<pre class="language-ts"><code>/);
+  assert.match(html, /^<div class="language-ts" dir="ltr"><pre class="shiki language-ts"><code>/);
   assert.match(html, /class="token keyword"/);
 });
 
@@ -36,19 +36,19 @@ test('未注册语言退化为转义纯文本', () => {
 test('语言名注入被清洗，不会破坏 class 属性', () => {
   const { html } = highlightBlock('x', 'js"><script>');
   assert.ok(!html.includes('<script>'));
-  assert.match(html, /^<pre class="language-/);
+  assert.match(html, /^<div class="language-/);
 });
 
 test('highlightBlock 对 diff / diff-js 按行加 .diff 标记', () => {
   const { html } = highlightBlock('+ a\n- b', 'diff');
-  assert.match(html, /^<pre class="language-diff"><code>/);
+  assert.match(html, /^<div class="language-diff" dir="ltr"><pre class="shiki language-diff has-diff"><code>/);
   assert.match(html, /class="line diff add"/);
   assert.match(html, /class="line diff remove"/);
   assert.ok(!html.includes('token prefix'));
   // diff-js 未注册语法，回落 diff 语法
   const js = highlightBlock('+ const a = 1;\n- const b = 2;', 'diff-js');
   assert.equal(js.ok, true);
-  assert.match(js.html, /^<pre class="language-diff-js"><code>/);
+  assert.match(js.html, /^<div class="language-diff-js" dir="ltr"><pre class="shiki language-diff-js has-diff"><code>/);
   assert.match(js.html, /class="line diff add"/);
 });
 
@@ -59,13 +59,13 @@ test('diff 增删行结构一致，内层保留 Prism 官方 token line 类', ()
   // remove 行：单 token；add 行：拆行空壳 + 内容 token
   assert.ok(
     html.includes(
-      '<span class="line diff remove"><span class="token deleted-sign deleted"><span class="token line"> a</span></span></span>',
+      '<span class="line diff remove"><span class="token deleted-sign deleted" style="--shiki-light:#b31d28;--shiki-dark:#fdaeb7"><span class="token line"> a</span></span></span>',
     ),
     html,
   );
   assert.ok(
     html.includes(
-      '<span class="line diff add"><span class="token deleted-sign deleted"><span class="token line"></span></span><span class="token inserted-sign inserted"><span class="token line"> b</span></span></span>',
+      '<span class="line diff add"><span class="token deleted-sign deleted" style="--shiki-light:#b31d28;--shiki-dark:#fdaeb7"><span class="token line"></span></span><span class="token inserted-sign inserted" style="--shiki-light:#22863a;--shiki-dark:#85e89d"><span class="token line"> b</span></span></span>',
     ),
     html,
   );
@@ -107,6 +107,20 @@ test('语言注册进共享 Prism 实例后 highlightBlock 可用', () => {
   assert.equal(ok, true);
   assert.equal(
     html,
-    '<pre class="language-demo"><code><span class="line"><span class="token keyword">demo</span> 1</span></code></pre>',
+    '<div class="language-demo" dir="ltr"><pre class="shiki language-demo"><code><span class="line"><span class="token keyword" style="--shiki-light:#d73a49;--shiki-dark:#ff7b72">demo</span> 1</span></code></pre></div>',
   );
+});
+
+test('highlightBlock: [!code info]/hl 行标记，pre 带 has-highlighted', () => {
+  const { html } = highlightBlock('a // [!code info]\nb // [!code hl]', 'js');
+  assert.match(html, /class="line highlighted info"/);
+  assert.match(html, /<pre class="shiki language-js has-highlighted"/);
+});
+
+test('highlightBlock: [!code highlight:2] 独占行从下一行起算（v3）', () => {
+  const { html } = highlightBlock('// [!code highlight:2]\na\nb\nc', 'js');
+  const lines = html.match(/<span class="line[^"]*"/g);
+  assert.equal(lines[0], '<span class="line highlighted"');
+  assert.equal(lines[1], '<span class="line highlighted"');
+  assert.equal(lines[2], '<span class="line"');
 });

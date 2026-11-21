@@ -27,13 +27,13 @@ export const RENDER_CASES = [
     source: '[外链](https://example.com)',
     check: (h) => /target="_blank"/.test(h) && /rel="noreferrer"/.test(h),
   },
-  { name: 'external-icon', source: '[外链](https://example.com)', check: (h) => /vp-external-link-icon/.test(h) },
+  { name: 'no-external-icon', source: '[外链](https://example.com)', check: (h) => !/vp-external-link-icon/.test(h) },
   {
     name: 'image-size',
     source: '![图](pic.png =100x200)',
     check: (h) => /width="100"[^>]*height="200"/.test(h),
   },
-  { name: 'image-lazy', source: '![图](pic.png)', check: (h) => /loading="lazy"/.test(h) },
+  { name: 'image-no-default-lazy', source: '![图](pic.png)', check: (h) => !/loading="lazy"/.test(h) },
   { name: 'hash-slug', source: hashLink, check: (h) => /href="#章节-标题"/.test(h) },
   { name: 'empty-anchor', source: '[跳](#)', check: (h) => /href="#"/.test(h) },
   {

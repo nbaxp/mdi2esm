@@ -8,7 +8,9 @@ node_modules/
 *.tgz
 .npm/
 .npmrc
-npm-debug.log*
+
+# 日志（通用临时产物，任何工具都可能产生）
+*.log
 
 # 编辑器/系统
 .DS_Store

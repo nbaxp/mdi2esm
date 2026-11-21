@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { bundle } from 'lightningcss';
+import { bundleAsync } from 'lightningcss';
 import { build } from 'vite';
 
 import { createBaseConfig } from '../vite.config.mjs';
@@ -73,11 +73,24 @@ async function main() {
   }
 
   // 2) 独立样式：src/styles/index.css → dist/index.css / dist/index.min.css（npm 包用）
+  // 官方文件从 node_modules/vitepress 整文件 @import 进来，这里内联成单文件。
+  // 裸包路径（vitepress/…）同步 bundle() 不解析，需 bundleAsync + 自定义 resolver。
+  const resolveVitePress = (specifier, originatingFile) => {
+    if (specifier.startsWith('vitepress/')) {
+      return path.resolve(root, 'node_modules', specifier);
+    }
+    return path.resolve(path.dirname(originatingFile), specifier);
+  };
+
   for (const [name, minify] of [
     ['index.css', false],
     ['index.min.css', true],
   ]) {
-    const { code } = bundle({ filename: path.join(root, 'src', 'styles', 'index.css'), minify });
+    const { code } = await bundleAsync({
+      filename: path.join(root, 'src', 'styles', 'index.css'),
+      minify,
+      resolver: { resolve: resolveVitePress },
+    });
     fs.writeFileSync(path.join(dist, name), code);
   }
 
@@ -99,10 +112,9 @@ async function main() {
     },
   });
 
-  // 4) 运行时 fetch 的示例源与静态资源。示例源在 dist 里叫 demo.md：
-  //    package.json 的 files 白名单按名字匹配会把 dist/README.md 也带进 npm 包，
-  //    换名后根 README.md（包文档）进包、dist/demo.md（演示源）只留在 gh-pages 产物里。
-  fs.copyFileSync(path.join(root, 'README.md'), path.join(dist, 'demo.md'));
+  // 4) 运行时 fetch 的示例源与静态资源。示例源是根目录 demo.md，
+  //    构建时拷成 dist/demo.md（index.html 运行时按这个名字 fetch）。
+  fs.copyFileSync(path.join(root, 'demo.md'), path.join(dist, 'demo.md'));
   fs.cpSync(path.join(root, 'public'), path.join(dist, 'public'), { recursive: true });
 
   console.log('built ->', path.relative(root, dist));

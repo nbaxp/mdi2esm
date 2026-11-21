@@ -101,4 +101,14 @@ export default defineConfig([
   },
 
   prettier,
+
+  // demo.md 的 VitePress 文档段逐字复制官方原文：代码块示例（无分号、
+  // 围栏写法等）属于内容，不能改；表格列宽、空行等纯排版差异交给 prettier 归一。
+  // 故仅对 demo.md 关闭「内嵌代码格式化」，其余 prettier 规则照常生效。
+  {
+    files: ['demo.md'],
+    rules: {
+      'prettier/prettier': ['error', { embeddedLanguageFormatting: 'off' }],
+    },
+  },
 ]);

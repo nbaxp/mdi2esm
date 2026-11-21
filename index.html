@@ -158,6 +158,16 @@
       .demo-rendered.vp-doc {
         max-width: none;
         margin: 0;
+        /* 官方靠外层 .VPDoc 的 padding-inline 容纳标题锚点（.header-anchor 左移
+           -0.87em）。本 demo 把 .vp-doc 直接放进 overflow:auto 的滚动容器，
+           没有那层 padding，# 会探出容器左界被裁；这里补齐（对齐官方响应式值）。 */
+        padding-inline: 1.5rem;
+      }
+
+      @media (min-width: 48rem) {
+        .demo-rendered.vp-doc {
+          padding-inline: 2rem;
+        }
       }
 
       /* demo 的滚动容器没有吸顶导航，锚点偏移缩小到视觉舒适值 */
@@ -165,14 +175,11 @@
         scroll-margin-top: 12px;
       }
 
-      /* 页内大纲：库样式按 VitePress 单栏布局（sticky + 100vh-2rem），
-         demo 是三栏全高布局，大纲改为占满栏高、内部滚动，不再吸顶。
+      /* 页内大纲：demo 三栏全高布局，大纲占满栏高、内部滚动（不吸顶）。
          用 relative 而非 static：.outline-marker 是 absolute，需要大纲做包含块 */
       #outline {
         position: relative;
-        max-height: none;
         height: 100%;
-        overflow-y: auto;
       }
 
       /* 短码生成的 <Icon> 是 svg：doc.css 里 svg 按块级排（图片语义），
@@ -205,6 +212,271 @@
       .medium-zoom-image--opened {
         z-index: 101;
       }
+      /* ---- 页内 [[toc]] ---- */
+      /* 默认输出是 <nav class="table-of-contents"><ul><li><a>…，只继承 .vp-doc 的
+   列表圆点与链接样式，这里改成无项目符号、可嵌套的卡片式目录。 */
+      .vp-doc .table-of-contents {
+        margin: 1.5rem 0;
+        padding: 0.75rem 1rem;
+        border: 1px solid var(--vp-c-divider);
+        border-radius: 8px;
+        background-color: var(--vp-c-bg-soft);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .vp-doc .table-of-contents ul {
+        margin: 0;
+        padding-inline-start: 0;
+        list-style: none;
+      }
+
+      .vp-doc .table-of-contents ul ul {
+        margin-top: 0.125rem;
+        padding-inline-start: 1rem;
+      }
+
+      .vp-doc .table-of-contents li {
+        margin: 0;
+      }
+
+      .vp-doc .table-of-contents a {
+        display: block;
+        padding: 3px 0;
+        color: var(--vp-c-text-2);
+        font-weight: 400;
+        text-decoration: none;
+      }
+
+      .vp-doc .table-of-contents a:hover {
+        color: var(--vp-c-brand-1);
+        text-decoration: none;
+      }
+
+      .vp-doc .table-of-contents a:focus-visible {
+        outline: 2px solid var(--vp-c-brand-1);
+        outline-offset: 2px;
+        border-radius: 2px;
+      }
+
+      /* 自动编号（config.markdown.toc.showAutoNumber）：标题与目录共用 */
+      .vp-doc .toc-number {
+        margin-inline-end: 0.35em;
+        color: var(--vp-c-text-2);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ---- 时间线（:::timeline） ---- */
+      .vp-doc .mdi-timeline {
+        margin: 1em 0;
+        padding: 16px 20px;
+        border: 1px solid var(--vp-c-divider);
+        border-radius: 8px;
+      }
+
+      .vp-doc .mdi-timeline__header {
+        margin-bottom: 12px;
+        font-weight: 600;
+        font-size: 1.05em;
+      }
+
+      .vp-doc .mdi-timeline__item {
+        position: relative;
+        padding-left: 22px;
+        padding-bottom: 16px;
+      }
+
+      .vp-doc .mdi-timeline__item:last-child {
+        padding-bottom: 0;
+      }
+
+      /* 竖向连接线（节点之间） */
+      .vp-doc .mdi-timeline__item::before {
+        content: '';
+        position: absolute;
+        left: 5px;
+        top: 16px;
+        bottom: -2px;
+        width: 1px;
+        background: var(--vp-c-divider);
+      }
+
+      .vp-doc .mdi-timeline__item:last-child::before {
+        display: none;
+      }
+
+      .vp-doc .mdi-timeline__node {
+        position: absolute;
+        left: 0;
+        top: 5px;
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: var(--vp-c-text-3);
+      }
+
+      .vp-doc .mdi-timeline__item--done .mdi-timeline__node {
+        background: var(--vp-c-success-1, #16a34a);
+      }
+
+      .vp-doc .mdi-timeline__item--doing .mdi-timeline__node {
+        background: var(--vp-c-brand-1, #3b82f6);
+      }
+
+      .vp-doc .mdi-timeline__item--milestone .mdi-timeline__node {
+        background: var(--vp-c-brand-1, #3b82f6);
+        box-shadow: 0 0 0 3px var(--vp-c-brand-soft, rgba(59, 130, 246, 0.2));
+      }
+
+      .vp-doc .mdi-timeline__item--error .mdi-timeline__node {
+        background: var(--vp-c-danger-1, #dc2626);
+      }
+
+      .vp-doc .mdi-timeline__time {
+        color: var(--vp-c-text-2);
+        font-size: 0.85em;
+      }
+
+      .vp-doc .mdi-timeline__title {
+        font-weight: 600;
+      }
+
+      .vp-doc .mdi-timeline__desc {
+        color: var(--vp-c-text-2);
+      }
+
+      .vp-doc .mdi-timeline__desc > :first-child {
+        margin-top: 0;
+      }
+
+      .vp-doc .mdi-timeline__desc > :last-child {
+        margin-bottom: 0;
+      }
+
+      /* ---- 页内目录（边栏） ---- */
+      /* 数值与 VitePress 的 VPDocAsideOutline / VPDocOutlineItem 保持一致：
+   1px 发丝线、1rem 内缩、容器 13px/500、链接 14px/400/行高 2.2857143、
+   独立 2px 品牌色标记。当前项在 VitePress 基础上再加强：品牌色文字 + 600 字重，
+   避免与 hover 的 text-1 混淆、保证弱对比环境下也可辨。 */
+      .vp-doc-outline {
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        border-inline-start: 1px solid var(--vp-c-divider);
+        padding-inline-start: 1rem;
+        font-size: 0.8125rem;
+        font-weight: 500;
+      }
+
+      .vp-doc-outline .outline-marker {
+        position: absolute;
+        top: 0;
+        inset-inline-start: 0;
+        z-index: 0;
+        width: 2px;
+        height: 1.125rem;
+        border-radius: 2px;
+        background-color: var(--vp-c-brand-1);
+        opacity: 0;
+        transition:
+          top 0.25s cubic-bezier(0, 1, 0.5, 1),
+          background-color 0.5s,
+          opacity 0.25s;
+      }
+
+      .vp-doc-outline .vp-doc-outline-title {
+        line-height: 2.2857143;
+        font-size: 0.875rem;
+        font-weight: 600;
+      }
+
+      .vp-doc-outline a {
+        position: relative;
+        z-index: 1;
+        display: block;
+        color: var(--vp-c-text-2);
+        font-size: 0.875rem;
+        font-weight: 400;
+        line-height: 2.2857143;
+        text-decoration: none;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: color 0.5s;
+      }
+
+      .vp-doc-outline a:hover {
+        color: var(--vp-c-text-1);
+        transition: color 0.25s;
+      }
+
+      .vp-doc-outline a.active,
+      .vp-doc-outline a[aria-current='location'] {
+        color: var(--vp-c-brand-1);
+        font-weight: 600;
+        transition: color 0.25s;
+      }
+
+      .vp-doc-outline a:focus-visible {
+        outline: 2px solid var(--vp-c-brand-1);
+        outline-offset: 2px;
+        border-radius: 2px;
+      }
+
+      .vp-doc-outline .lvl-2 {
+        padding-inline-start: 0;
+      }
+
+      .vp-doc-outline .lvl-3 {
+        padding-inline-start: 1rem;
+      }
+
+      .vp-doc-outline .lvl-4 {
+        padding-inline-start: 2rem;
+      }
+
+      /* ---- Mermaid / 数学占位 ---- */
+      /* pele 的 --pele-* 配色变量由 MermaidBlock 组件内联（src/mermaid.js）从 --vp-* 派生，
+   不依赖本 CSS：宿主只引 JS 时暗色模式同样生效 */
+      .vp-doc .mermaid-rendered {
+        margin: 1rem 0;
+        overflow-x: auto;
+      }
+
+      /* ECharts 容器：高度由组件内联（config.echarts.height），宽度自适应 */
+      .vp-doc .echarts-rendered {
+        margin: 1rem 0;
+        overflow-x: auto;
+      }
+
+      /* ECharts 降级源码：与 mermaid-source 同款卡片 */
+      .vp-doc .echarts-source {
+        margin: 1rem 0;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        background-color: var(--vp-code-block-bg);
+        font-family: var(--vp-font-family-mono);
+        font-size: var(--vp-code-font-size);
+      }
+
+      /* 表格转图表：容器宽度撑满，高度由组件内联 */
+      .vp-doc .echarts-table-chart {
+        width: 100%;
+      }
+
+      .vp-doc .mermaid-source {
+        margin: 1rem 0;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        background-color: var(--vp-code-block-bg);
+        font-family: var(--vp-font-family-mono);
+        font-size: var(--vp-code-font-size);
+      }
+
+      .vp-doc .md-math-placeholder[data-display='true'] {
+        display: block;
+        margin: 1rem 0;
+        overflow-x: auto;
+      }
     </style>
   </head>
   <body>
@@ -226,6 +498,10 @@
         允许多目录
       </label>
       <label class="demo-toc">
+        <input type="checkbox" id="external-icon" />
+        外链图标
+      </label>
+      <label class="demo-toc">
         目录层级
         <select id="toc-level">
           <option value="2,3" selected>H2–H3（默认）</option>
@@ -239,8 +515,8 @@
     </header>
     <main class="demo-main">
       <section>
-        <p class="demo-col-title">Markdown 源（README.md，可编辑）</p>
-        <textarea id="src" class="demo-src" spellcheck="false"></textarea>
+        <p class="demo-col-title">Markdown 源（demo.md，可编辑）</p>
+        <textarea id="src" class="demo-src" spellcheck="false" wrap="off"></textarea>
       </section>
       <section>
         <p class="demo-col-title">渲染结果</p>
@@ -386,10 +662,9 @@
       const content = document.getElementById('content');
       const outline = document.getElementById('outline');
 
-      // README.md 既是包文档，也是本 demo 可编辑示例的初始值；运行时取，不靠构建期内联
-      // 示例源：dev 取根目录 README.md（源码实时可改），build 后取 dist/demo.md
-      //（换名是为了避开 npm files 白名单，见 scripts/build.mjs 第 4 步）
-      const readme = await fetch(import.meta.env.DEV ? './README.md' : './demo.md').then((res) => res.text());
+      // demo.md 是本 demo 可编辑示例的初始值；运行时取，不靠构建期内联
+      // 示例源：dev 取根目录 demo.md（源码实时可改），build 后取 dist/demo.md
+      const readme = await fetch('./demo.md').then((res) => res.text());
       ta.value = readme;
 
       // 目录配置：URL 参数驱动。md 是模块级单例，配置在首次渲染时锁定
@@ -427,6 +702,7 @@
       let spyLinks = [];
       let spyTargets = [];
       let spyRaf = 0;
+      let spyLines = new Map();
 
       // 大纲层级交给 .vp-doc-outline .lvl-N 控制，不写内联样式
       function renderOutline(items, container, level = 2) {
@@ -462,9 +738,26 @@
         spyTargets = spyLinks.map((a) => document.getElementById(a.dataset.target));
       }
 
+      // 左栏源码同步：按当前标题的源码行滚动 textarea（wrap=off，行号→像素线性）。
+      // 顶部对齐：目标行落在视口首行，与右栏标题在顶部的语义一致
+      function syncSourceScroll(slug) {
+        const line = spyLines.get(slug);
+        if (!line) return;
+        const style = getComputedStyle(ta);
+        const lineHeight = parseFloat(style.lineHeight) || 19.2;
+        const pad = parseFloat(style.paddingTop) || 0;
+        const top = pad + (line - 1) * lineHeight;
+        ta.scrollTop = Math.max(0, Math.min(top, ta.scrollHeight - ta.clientHeight));
+      }
+
       function updateActive() {
         spyRaf = 0;
         if (!spyLinks.length) return;
+        if (!spyTouched) {
+          spyLinks.forEach((a) => a.classList.remove('active'));
+          if (marker) marker.style.opacity = '0';
+          return;
+        }
         const threshold = content.getBoundingClientRect().top + 16;
         let index = 0;
         for (let i = 0; i < spyTargets.length; i += 1) {
@@ -475,12 +768,7 @@
 
         const active = spyLinks[index];
         if (!active) return;
-        // 滚动同步 URL：仅当前项变化时 replaceState（不触发 hashchange，
-        // 不会与点击大纲 / 锚点定位互相触发）
-        const id = active.dataset.target;
-        if (id !== decodeURIComponent(location.hash.slice(1))) {
-          history.replaceState(null, '', id ? `#${id}` : location.pathname + location.search);
-        }
+        syncSourceScroll(active.dataset.target);
         if (marker) {
           marker.style.top = `${active.offsetTop + (active.offsetHeight - marker.offsetHeight) / 2}px`;
           marker.style.opacity = '1';
@@ -500,7 +788,16 @@
         spyRaf = requestAnimationFrame(updateActive);
       }
 
-      content.addEventListener('scroll', scheduleActive, { passive: true });
+      // 刚进入（未滚动）不设当前态；点击/锚点跳转、手动滚动都会触发 scroll，之后才有高亮
+      let spyTouched = false;
+      content.addEventListener(
+        'scroll',
+        () => {
+          spyTouched = true;
+          scheduleActive();
+        },
+        { passive: true },
+      );
       window.addEventListener('resize', scheduleActive);
 
       // 正文在 .demo-rendered 独立滚动容器里，浏览器对 #id 的锚点跳转只滚 window，
@@ -513,6 +810,9 @@
         const align = () => {
           const top = el.getBoundingClientRect().top - content.getBoundingClientRect().top + content.scrollTop - 12;
           content.scrollTo({ top, behavior });
+          // 锚点进入/点击跳转后立即同步左栏与当前态（scroll 事件未必触发，如目标本就在首屏）
+          spyTouched = true;
+          scheduleActive();
         };
         const imgs = [...content.querySelectorAll('img')];
         imgs.forEach((img) => {
@@ -574,6 +874,7 @@
         // 标题元素要等新组件 patch 进 DOM 才取得到
         await nextTick();
         collectOutlineTargets();
+        spyLines = new Map(headings.map((h) => [h.slug, h.line]));
         scheduleActive();
         // 带锚点刷新（如 #时间线）：浏览器只滚 window，这里在首帧按 hash 定位到预览区，
         // 高亮由滚动事件触发同步；仅处理一次，编辑重编译不会反复跳走
@@ -663,6 +964,15 @@
       }
       document.getElementById('diagram-driver').addEventListener('change', (event) => {
         driver.value = event.target.value;
+      });
+      // 外链图标：官方 externalLinkIcon 配置对应给 .vp-doc 祖先加 .external-link-icon-enabled
+      // class，CSS 的 ::after 才渲染图标（默认关闭）。这里切换该 class 演示这个配置项；
+      // 加在 #content 的父 section（即 .vp-doc 的祖先）上，符合官方选择器层级要求。
+      const externalIconToggle = document.getElementById('external-icon');
+      externalIconToggle.addEventListener('change', () => {
+        document
+          .getElementById('content')
+          .parentElement.classList.toggle('external-link-icon-enabled', externalIconToggle.checked);
       });
       document.getElementById('toggle-theme').addEventListener('click', () => {
         document.documentElement.classList.toggle('dark');

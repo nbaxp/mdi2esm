@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildOutline, createConfig, renderMarkdown } from '../src/index.js';
+import { buildOutline, createConfig, createMarkdownComponent, renderMarkdown } from '../src/index.js';
 import { escapeInvalidInterpolations, resolvePath } from '../src/render.js';
 import { RENDER_CASES } from './fixtures/render-cases.js';
 
@@ -78,12 +78,25 @@ test('buildOutline：按 level 生成层级树', async () => {
   assert.equal(tree[1].title, 'C');
 });
 
-test('http(s) 外链追加图标且加 target/rel', async () => {
+test('headings 带源码行号 line（1-based）', async () => {
+  const { headings } = await renderMarkdown('## 一\n\n正文\n\n## 二');
+  assert.deepEqual(
+    headings.map((h) => h.line),
+    [1, 5],
+  );
+});
+
+test('headings.line 含 frontmatter/script 剥离偏移', async () => {
+  const src = '---\ntitle: T\n---\n\n<script setup>\nconst a = 1\n</script>\n\n## 标题';
+  const { headings } = await createMarkdownComponent(src, '', createConfig(), { frontmatter: {} });
+  assert.equal(headings[0].line, 9);
+});
+
+test('http(s) 外链加 target/rel，但不注入图标 DOM（对齐 VitePress 默认）', async () => {
   const { html } = await renderMarkdown('[VitePress](https://vitepress.dev) 文本');
-  assert.match(html, /<a href="https:\/\/vitepress\.dev" target="_blank" rel="noreferrer">VitePress/);
-  assert.match(html, /vp-external-link-icon/);
-  assert.match(html, /<svg/);
-  assert.match(html, /VitePress<svg[^>]*vp-external-link-icon/);
+  assert.match(html, /<a href="https:\/\/vitepress\.dev" target="_blank" rel="noreferrer">VitePress<\/a>/);
+  assert.equal(html.includes('vp-external-link-icon'), false);
+  assert.equal(html.includes('<svg'), false);
 });
 
 test('mailto/tel 外链只加 target，不加图标', async () => {
@@ -100,7 +113,24 @@ test('内部链接不加 target 与图标', async () => {
 
 test('image =WxH 解析为 width/height 并剥离尺寸后缀', async () => {
   const { html } = await renderMarkdown('![a](img.png =200x300)');
-  assert.match(html, /<img src="[^"]*img\.png"[^>]*width="200" height="300" loading="lazy">/);
+  assert.match(html, /<img src="[^"]*img\.png"[^>]*width="200" height="300"/);
+});
+
+test('图片懒加载默认关闭（对齐 VitePress），不附加 loading', async () => {
+  const { html } = await renderMarkdown('![a](img.png)');
+  assert.ok(!/loading="lazy"/.test(html));
+});
+
+test('markdown.image.lazyLoad=true 时相对路径图片加 loading=lazy', async () => {
+  const config = createConfig({ markdown: { image: { lazyLoad: true } } });
+  const { html } = await renderMarkdown('![a](img.png)', { config });
+  assert.match(html, /<img[^>]*loading="lazy"/);
+});
+
+test('lazyLoad=true 时外链/data 图片仍不加 loading', async () => {
+  const config = createConfig({ markdown: { image: { lazyLoad: true } } });
+  const { html } = await renderMarkdown('![a](https://x.com/a.png)\n\n![b](data:image/png;base64,AAA)', { config });
+  assert.ok(!/loading="lazy"/.test(html));
 });
 
 test('image =Wx 仅设置 width', async () => {

@@ -132,7 +132,10 @@ md.use(anchor, {
       const headingToken = state.tokens[idx];
       headingToken.meta = { ...(headingToken.meta ?? {}), number };
       (state.env.tocNumbersBySlug ??= {})[slug] = number;
-      state.env.headings?.push({ level, title, slug });
+      // line：标题在原文中的行号（1-based）。优先用 env.lineMap 还原（剥离 frontmatter/script 后仍准确），否则退回 body 内行号
+      const mapLine = headingToken.map?.[0] ?? 0;
+      const line = state.env.lineMap?.[mapLine] ?? mapLine + 1;
+      state.env.headings?.push({ level, title, slug, line });
     }
     children.push(
       Object.assign(new state.Token('text', '', 0), { content: ' ' }),
@@ -250,7 +253,11 @@ function createCodeGroupOpenRender() {
         const title = extractTitle(isHtml ? tokens[i].content : tokens[i].info);
         if (title) {
           tabs += `<input type="radio" name="group-${idx}" id="tab-${i}" ${checked}><label data-title="${md.utils.escapeHtml(title)}" for="tab-${i}">${title}</label>`;
-          if (checked && !isHtml) tokens[i].info += ' active';
+          if (!isHtml) {
+            if (checked) tokens[i].info += ' active';
+            // preWrapper 用 meta 判定：组内标题只作 tab 标签，不渲染 .vp-code-block-title
+            tokens[i].meta = { ...(tokens[i].meta ?? {}), codeGroup: true };
+          }
           checked = '';
         }
       }

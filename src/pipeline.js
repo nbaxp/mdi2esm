@@ -30,6 +30,8 @@ function collectComponentRoots(instance) {
 export function extractTopLevelBlocks(raw, { extractScripts = true } = {}) {
   const lines = raw.split(/\r?\n/);
   const body = [];
+  // lineMap[i]：body 第 i 行在 raw 中的行号（1-based），供 headings 还原原文行号
+  const lineMap = [];
   const scripts = [];
   const styles = [];
   let fence = null;
@@ -48,12 +50,14 @@ export function extractTopLevelBlocks(raw, { extractScripts = true } = {}) {
     if (fence) {
       if (line.trim() === fence) fence = null;
       body.push(line);
+      lineMap.push(i + 1);
       continue;
     }
     const fenceMatch = /^\s{0,3}(`{3,}|~{3,})/.exec(line);
     if (fenceMatch) {
       fence = fenceMatch[1];
       body.push(line);
+      lineMap.push(i + 1);
       continue;
     }
     // 只认第一个 <script>：其后正文里的 <script> 是文档内容，不剥离
@@ -72,8 +76,9 @@ export function extractTopLevelBlocks(raw, { extractScripts = true } = {}) {
       continue;
     }
     body.push(line);
+    lineMap.push(i + 1);
   }
-  return { body: body.join('\n'), scripts, styles };
+  return { body: body.join('\n'), scripts, styles, lineMap };
 }
 
 /**
@@ -108,13 +113,15 @@ export async function createMarkdownComponent(source, dir, config, { frontmatter
   const parsed = parse(source);
   const data = frontmatter ?? parsed.data;
   // markdown.scripts === false：不提取也不执行 <script>（严格模式），第一个 <script> 留在正文
-  const { body, scripts, styles } = extractTopLevelBlocks(parsed.body, {
+  const { body, scripts, styles, lineMap } = extractTopLevelBlocks(parsed.body, {
     extractScripts: config?.markdown?.scripts !== false,
   });
   // markdown-it-emoji 不内置：装了就挂上（幂等），没装静默跳过，渲染结果不受影响
   if (!body.trim()) return { component: null, headings: [] };
   await ensureEmojiPlugin();
-  const { html, headings } = await renderMarkdown(body, { dir, config });
+  // lineMap 是 body 每行在 parsed.body 中的行号，叠加 frontmatter 偏移得到原文行号
+  const sourceLineMap = lineMap.map((n) => n + (parsed.bodyLine ?? 1) - 1);
+  const { html, headings } = await renderMarkdown(body, { dir, config, lineMap: sourceLineMap });
 
   const options = {
     // 不给 name：这是每份 md 一次性编出来的渲染组件，同名只会在 devtools 里混淆

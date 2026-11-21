@@ -1,0 +1,11 @@
+/* .vp-doc 作用域 box-sizing。官方等价规则在 base.css 的 preflight（全局 *），
+   这里限定 .vp-doc 作用域，避免污染宿主页面。属 mdi2esm 自定义。 */
+/* 原版：https://github.com/vuejs/vitepress/blob/v2.0.0-alpha.21/src/client/theme-default/styles/components/vp-doc.css */
+/* box-sizing 重置：原版 VitePress preflight（styles/base.css）的 *,::before,::after 规则，
+   这里按 .vp-doc 作用域等价限定。code 的 min-width:100% 依赖 border-box，否则会超出 pre 产生横向滚动。 */
+.vp-doc,
+.vp-doc *,
+.vp-doc *::before,
+.vp-doc *::after {
+  box-sizing: border-box;
+}

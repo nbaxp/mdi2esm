@@ -2,7 +2,7 @@
 
 本文档与代码同步，说明 mdi2esm 要解决的问题、设计取舍与当前实现。面向需要改源码或评估接入门槛的读者；接入用法见 [README.md](./README.md)。
 
-> 版本 1.0.0。文档与代码同步维护；若不一致，以代码为准并修订本文。
+> 版本 1.0.1。文档与代码同步维护；若不一致，以代码为准并修订本文。
 
 ## 1. 要解决的问题
 
@@ -57,7 +57,7 @@ Markdown 原文
 渲染层只做两件通用的事：
 
 - **相对解析** `resolvePath(base, rel)`：把 `./`、`../` 折叠成规范化路径；
-- **形态归一化**：外链加 `target/rel/图标`、`#anchor` 归一化、图片 `=WxH` 尺寸、`loading=lazy`。
+- **形态归一化**：外链加 `target/rel`（外链图标交给 CSS 层，默认关闭）、`#anchor` 归一化、图片 `=WxH` 尺寸；`loading=lazy` 由 `config.markdown.image.lazyLoad` 控制，默认禁用。
 
 URL 的**拼装规则**交给 `config.adapters` 的四个函数（`src/config.js`）：
 
@@ -90,7 +90,7 @@ adapters 只接收路径/上下文字段（见上表），不接收每次渲染�
 - **运行时按需**：KaTeX、Mermaid/Pele、ECharts、medium-zoom 都走 `src/lazy-module.js` 的 `lazyModule(importFn, onFail)`——promise 缓存 + 失败回 `null`，由调用方降级（公式按原始文本、图片不放大、图表留源码占位）。
 - **图表实例管理**：`src/echarts.js` 的 `useECharts(el, height, getOption, { sourceText })` 统一 `EChartsBlock` 与 `EChartsTableBlock` 的 init / setOption / 暗色重建 / resize / dispose / 降级；`loadOption` 用 Blob URL 求值 JS 字面量 option。
 - **不内置**：markdown-it-emoji（可选 peer，装了才启用，`ensureEmojiPlugin` 幂等）、Iconify 图标（由宿主注入 `Icon` 组件）。
-- **样式**：只有 `src/styles/index.css`（`@import` vars/icons/doc）必带，构建为 `dist/index.css`；**无独立 `prism.css`**——Prism token 配色在 `doc.css`，换主题覆盖 `--vp-*` / `.dark` / `.token` 规则；KaTeX 的 CSS 由宿主自己 import，库不注入 `<link>`。
+- **样式**：只有 `src/styles/index.css` 必带，它整文件引入官方 VitePress 样式（vars/icons/vp-doc/custom-block/vp-code-group/utils）并 `@import` 自写补丁（`code-block.css` 含 Prism token 配色与标题栏、`vp-doc-reset.css`、`vp-badge.css`），由 lightningcss 构建为单文件 `dist/index.css`；**无独立 `prism.css`**——Prism token 配色在自写 `code-block.css`，换主题覆盖 `--vp-*` / `.dark` / `.token` 规则；KaTeX 的 CSS 由宿主自己 import，库不注入 `<link>`。
 
 ### 2.7 组件边界
 
@@ -114,28 +114,28 @@ adapters 只接收路径/上下文字段（见上表），不接收每次渲染�
 
 ### 3.1 文件结构
 
-| 文件                          | 职责                                                                                                                                                                                             |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/index.js`                | 包入口，只导出公共 API                                                                                                                                                                           |
-| `src/config.js`               | `createConfig` / `createRenderEnv` / `createBaseAdapters` / 默认文案                                                                                                                             |
-| `src/markdown-it.js`          | markdown-it 实例与插件装配、锚点/目录、容器、github-alerts、数学占位、图标短码、音视频嵌入、时间线                                                                                               |
-| `src/render.js`               | `renderMarkdown` / `buildOutline` / `link_rewrite`（链接、图片与音视频 src 重写 core 规则）                                                                                                      |
-| `src/pipeline.js`             | `createMarkdownComponent`：frontmatter → 块提取 → 渲染 → 组件装配                                                                                                                                |
-| `src/markdown-script.js`      | `<script>` / `<script setup>` 的模块拼接与 Blob 加载                                                                                                                                             |
-| `src/markdown-plugins.js`     | 官方纯规则：实体还原、表格、语言提取、hash 归一化                                                                                                                                                |
-| `src/code-block.js`           | 代码块 `preWrapper`/`v-pre`/围栏 marker 保护                                                                                                                                                     |
-| `src/code-lines.js`           | 行号与高亮行的 HTML 切分                                                                                                                                                                         |
-| `src/prism.js`                | Prism 封装（语言别名归一、同步高亮）                                                                                                                                                             |
-| `src/code-block-component.js` | 独立 `highlightBlock` 组件（预览/复制）                                                                                                                                                          |
-| `src/math.js`                 | KaTeX 占位标记的运行时替换                                                                                                                                                                       |
-| `src/mermaid.js`              | `MermaidBlock` 组件与双驱动（pele/mermaid）                                                                                                                                                      |
-| `src/echarts.js`              | `useECharts`（图表实例生命周期）/ `loadOption`（Blob URL 求值 JS 字面量 option）/ `EChartsBlock` 组件（可选 peer）                                                                               |
-| `src/echarts-table.js`        | `EChartsTableBlock` 组件：表格数据 + option → 图表（复用 `useECharts`）                                                                                                                          |
-| `src/table-chart.js`          | 表格首格 `:type: {options}` → `<EChartsTableBlock>` 的渲染规则与 option 构造                                                                                                                     |
-| `src/image-zoom.js`           | medium-zoom 图片放大                                                                                                                                                                             |
-| `src/frontmatter.js`          | frontmatter 剥离与内置子集解析（可替换）                                                                                                                                                         |
-| `src/lazy-module.js`          | 可选依赖的惰性加载封装                                                                                                                                                                           |
-| `src/styles/`                 | `index.css`（样式入口：`@import` vars/icons/doc，构建合并为 `dist/index.css`）、`doc.css`（正文/容器/代码 + Prism token 配色）、`icons.css`（copy / external-link 图标）、`vars.css`（主题变量） |
+| 文件                          | 职责                                                                                                                                                                                                                    |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/index.js`                | 包入口，只导出公共 API                                                                                                                                                                                                  |
+| `src/config.js`               | `createConfig` / `createRenderEnv` / `createBaseAdapters` / 默认文案                                                                                                                                                    |
+| `src/markdown-it.js`          | markdown-it 实例与插件装配、锚点/目录、容器、github-alerts、数学占位、图标短码、音视频嵌入、时间线                                                                                                                      |
+| `src/render.js`               | `renderMarkdown` / `buildOutline` / `link_rewrite`（链接、图片与音视频 src 重写 core 规则）                                                                                                                             |
+| `src/pipeline.js`             | `createMarkdownComponent`：frontmatter → 块提取 → 渲染 → 组件装配                                                                                                                                                       |
+| `src/markdown-script.js`      | `<script>` / `<script setup>` 的模块拼接与 Blob 加载                                                                                                                                                                    |
+| `src/markdown-plugins.js`     | 官方纯规则：实体还原、表格、语言提取、hash 归一化                                                                                                                                                                       |
+| `src/code-block.js`           | 代码块 `preWrapper`/`v-pre`/围栏 marker 保护                                                                                                                                                                            |
+| `src/code-lines.js`           | 行号与高亮行的 HTML 切分                                                                                                                                                                                                |
+| `src/prism.js`                | Prism 封装（语言别名归一、同步高亮）                                                                                                                                                                                    |
+| `src/code-block-component.js` | 独立 `highlightBlock` 组件（预览/复制）                                                                                                                                                                                 |
+| `src/math.js`                 | KaTeX 占位标记的运行时替换                                                                                                                                                                                              |
+| `src/mermaid.js`              | `MermaidBlock` 组件与双驱动（pele/mermaid）                                                                                                                                                                             |
+| `src/echarts.js`              | `useECharts`（图表实例生命周期）/ `loadOption`（Blob URL 求值 JS 字面量 option）/ `EChartsBlock` 组件（可选 peer）                                                                                                      |
+| `src/echarts-table.js`        | `EChartsTableBlock` 组件：表格数据 + option → 图表（复用 `useECharts`）                                                                                                                                                 |
+| `src/table-chart.js`          | 表格首格 `:type: {options}` → `<EChartsTableBlock>` 的渲染规则与 option 构造                                                                                                                                            |
+| `src/image-zoom.js`           | medium-zoom 图片放大                                                                                                                                                                                                    |
+| `src/frontmatter.js`          | frontmatter 剥离与内置子集解析（可替换）                                                                                                                                                                                |
+| `src/lazy-module.js`          | 可选依赖的惰性加载封装                                                                                                                                                                                                  |
+| `src/styles/`                 | `index.css`（样式入口：整文件 `@import` 官方 VitePress 6 个 CSS，再 `@import` 自写补丁，构建合并为 `dist/index.css`）；自写补丁 `code-block.css`（Prism token 配色 + 代码块标题栏）、`vp-doc-reset.css`、`vp-badge.css` |
 
 仓库根另有 demo 页面 `index.html`（左编辑右预览，示例图片在 `public/`）与 `scripts/build.mjs`；`vite.config.mjs` 提供 `vue` / `mdi2esm` 别名，dev、build、preview 共用。
 
@@ -166,9 +166,9 @@ adapters 只接收路径/上下文字段（见上表），不接收每次渲染�
 
 ### 3.4 样式产物
 
-- `dist/index.css` = `vars.css` + `icons.css` + `doc.css`（含 Prism token 配色，必带）；
-- 没有独立 `prism.css`：配色是 `doc.css` 的一部分，换主题改 `--vp-*` / `.dark` 变量或直接覆盖 `.token` 规则。
-- 宿主主题变量与 `vp-doc` / `mdi-code` 选择器约定见 `doc.css`（接入细节见 README 样式章节）。
+- `dist/index.css` = 官方 VitePress 样式（vars/icons/vp-doc/custom-block/vp-code-group/utils）+ 自写补丁（`code-block.css` 含 Prism token 配色与标题栏、`vp-doc-reset.css`、`vp-badge.css`），必带；
+- 没有独立 `prism.css`：配色是 `code-block.css` 的一部分，换主题改 `--vp-*` / `.dark` 变量或直接覆盖 `.token` 规则。
+- 宿主主题变量与 `vp-doc` / `mdi-code` 选择器约定见 README 样式章节。
 
 ### 3.5 构建与分发
 
@@ -176,7 +176,7 @@ adapters 只接收路径/上下文字段（见上表），不接收每次渲染�
 - `package.json` 的 `exports`：`.`（`development` → `dist/index.js`，默认 → `dist/index.min.js`）、`./index`、`./index.min`、`./index.css`、`./index.min.css`、`./package.json`。
 - **dependencies**：markdown-it 栈（`markdown-it` / `@mdit/*` / `@mdit-vue/*` / `markdown-it-cjk-friendly`）与 `prismjs`（构建期内联进产物）；**peerDependencies**：`vue`、`vue-style-runtime`（宿主提供，产物静态导入）；可选 peer：markdown-it-emoji、katex、mermaid、pele、echarts、medium-zoom、@iconify/vue（依赖清单与脚本见 README）。
 - **浏览器基线**：原生 ESM、动态 `import()`、Blob URL / `URL.createObjectURL`、importmap（可选）、CSS 自定义属性；宿主 Vue 必须是**含模板编译器**的构建（`compile` 需要）。
-- **体积**（v1.0.0，含表格转图表 / 目录增强 / 时间线 / 音视频；内联 Prism 核心 + 常用语言与 markdown-it 栈）：`dist/index.js` ≈ 464 KB、`dist/index.min.js` ≈ 319 KB、`dist/index.css` ≈ 38 KB、`dist/index.min.css` ≈ 33 KB（实测字节 475636 / 326660 / 39169 / 34201）；重依赖（KaTeX / Mermaid / Pele / ECharts / medium-zoom）不内联，按需动态加载。
+- **体积**（v1.0.1，含表格转图表 / 目录增强 / 时间线 / 音视频；内联 Prism 核心 + 常用语言与 markdown-it 栈；CSS 整文件引入官方 VitePress 6 个样式）：`dist/index.js` ≈ 468 KB、`dist/index.min.js` ≈ 322 KB、`dist/index.css` ≈ 43 KB、`dist/index.min.css` ≈ 38 KB（实测字节 479814 / 329927 / 44186 / 39345）；重依赖（KaTeX / Mermaid / Pele / ECharts / medium-zoom）不内联，按需动态加载。
 
 ### 3.6 已知边界（实现现状）
 
