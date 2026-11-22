@@ -116,7 +116,10 @@ export async function createMarkdownComponent(source, dir, config, { frontmatter
   // 浏览器端 <<< / @include 展开：仅当宿主给出 sourcePath 时启用（默认行为不变）。
   // 展开在 frontmatter 解析之前完成，stripFrontmatter 由 expandSource 内部负责。
   if (sourcePath != null) {
-    source = await expandSource(source, sourcePath, { base: config?.markdown?.include?.base ?? '/' });
+    source = await expandSource(source, sourcePath, {
+      base: config?.markdown?.include?.base ?? '/',
+      adapters: config?.adapters,
+    });
   }
   // frontmatter：宿主显式传入优先，否则用（可替换的）内置子集解析器
   const parse = config?.markdown?.frontmatterParser ?? parseFrontmatter;
@@ -146,7 +149,7 @@ export async function createMarkdownComponent(source, dir, config, { frontmatter
       MermaidBlock: createMermaidBlock(config?.mermaidDriver),
       EChartsBlock: createEChartsBlock(config?.echarts),
       // 表格首格 :line: 等声明渲染成 <EChartsTableBlock>，图表由组件画，管线不碰 DOM
-      EChartsTableBlock: createEChartsTableBlock(config?.echarts),
+      EChartsTableBlock: createEChartsTableBlock({ ...config?.echarts, adapters: config?.adapters }),
     },
     // 图片缩放：medium-zoom 动态加载，仅当正文有可放大图片时挂载
     async mounted() {

@@ -5,7 +5,7 @@
 // md 用库内实例；其余逻辑（region / 标题锚点 / rebase marker / 循环检测）保持一致。
 import md from './markdown-it.js';
 import { dedent, findRegions, stripRegionMarkers } from './markdown-regions.js';
-import { resolvePath } from './render.js';
+import { createResourceResolver, defaultFetcher, isExternal, normalizeBase, resolvePath } from './url.js';
 
 // 只剥离文件顶部结构有效的 frontmatter：不解析 YAML、不做语义校验、不改动正文
 function stripFrontmatter(raw) {
@@ -33,36 +33,38 @@ const LINES_RE = /^\d+(?:[,-]\d+)*$/;
 
 const cache = new Map();
 
-function loadText(url) {
+// 失败时从缓存移除，避免一次网络故障被永久缓存、重试永远失败
+export function clearSourceCache() {
+  cache.clear();
+}
+
+function loadText(ctx, url) {
   if (!cache.has(url)) {
-    cache.set(
-      url,
-      fetch(url).then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.text();
-      }),
-    );
+    const pending = ctx.fetcher(url).then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.text();
+    });
+    pending.catch(() => cache.delete(url));
+    cache.set(url, pending);
   }
   return cache.get(url);
 }
 
-function warn(message) {
-  console.warn(`[mdi2esm] ${message}`);
+function warn(ctx, message) {
+  if (ctx.onResolveError) ctx.onResolveError(message);
+  else console.warn(`[mdi2esm] ${message}`);
 }
 
 const dirOf = (file) => file.slice(0, file.lastIndexOf('/') + 1);
 
-// base 归一为以 / 结尾的前缀；@/ 指向站点根，其余按当前文件的物理目录解析
-const withSlash = (base) => (!base || base.endsWith('/') ? (base ?? '/') : `${base}/`);
-
-function resolveTarget(spec, currentFile, base) {
-  const root = withSlash(base);
-  if (spec.startsWith('@')) {
-    const rest = spec.slice(SEPARATOR_RE.test(spec[1]) ? 2 : 1);
-    return { file: rest, url: root + rest };
-  }
-  const file = resolvePath(dirOf(currentFile), spec);
-  return { file, url: root + file };
+// @/ 指向站点根，其余按当前文件的物理目录解析；最终 URL 由统一资源解析器产出。
+function resolveTarget(spec, currentFile, ctx) {
+  let file;
+  if (isExternal(spec)) file = spec;
+  else if (spec.startsWith('@')) file = spec.slice(SEPARATOR_RE.test(spec[1]) ? 2 : 1);
+  else file = resolvePath(dirOf(currentFile), spec);
+  // 外链（含 //）直接由解析器原样返回，base 不再参与
+  return { file, url: ctx.resolveResource({ file, spec, kind: 'source' }) };
 }
 
 // snippet.ts:153-178
@@ -124,15 +126,15 @@ function fenceFor(code) {
   return '`'.repeat(max + 1);
 }
 
-async function expandSnippet(raw, currentFile, base) {
+async function expandSnippet(raw, currentFile, ctx) {
   const parsed = parseSnippetPath(raw);
   if (!parsed.filepath) return null;
-  const { url } = resolveTarget(parsed.filepath, currentFile, base);
+  const { url } = resolveTarget(parsed.filepath, currentFile, ctx);
   let content;
   try {
-    content = await loadText(url);
+    content = await loadText(ctx, url);
   } catch (err) {
-    warn(`代码片段加载失败：${url}（${err.message}），保留原指令`);
+    warn(ctx, `代码片段加载失败：${url}（${err.message}），保留原指令`);
     return null;
   }
   let lines = content.replace(/\r\n/g, '\n').split('\n');
@@ -140,7 +142,7 @@ async function expandSnippet(raw, currentFile, base) {
   if (parsed.region) {
     const regions = findRegions(lines, parsed.region);
     if (regions.length === 0) {
-      warn(`代码片段 region "${parsed.region}" 不存在：${url}，保留原指令`);
+      warn(ctx, `代码片段 region "${parsed.region}" 不存在：${url}，保留原指令`);
       return null;
     }
     lines = regions.flatMap((r) => lines.slice(r.start, r.end));
@@ -176,7 +178,7 @@ function findHeadingSection(content, anchor) {
   return { start: heading.map[1], end };
 }
 
-async function expandInclude(raw, currentFile, ancestors, inFence, isOwnLine, base) {
+async function expandInclude(raw, currentFile, ancestors, inFence, isOwnLine, ctx) {
   let spec = raw;
   const range = RANGE_RE.exec(spec);
   if (range) spec = spec.slice(0, range.index);
@@ -184,14 +186,14 @@ async function expandInclude(raw, currentFile, ancestors, inFence, isOwnLine, ba
   if (region) spec = spec.slice(0, region.index);
   spec = spec.trim();
   if (!spec) return null;
-  const { file, url } = resolveTarget(spec, currentFile, base);
+  const { file, url } = resolveTarget(spec, currentFile, ctx);
   // 只沿祖先链判环：兄弟节点仍可重复包含同一文件
   if (file === currentFile || ancestors.includes(file)) return null;
   let content;
   try {
-    content = await loadText(url);
+    content = await loadText(ctx, url);
   } catch (err) {
-    warn(`Include 文件加载失败：${url}（${err.message}），保留原指令`);
+    warn(ctx, `Include 文件加载失败：${url}（${err.message}），保留原指令`);
     return null;
   }
   // 有 range 且无 region 时保留 frontmatter，让行号与源文件一致
@@ -204,7 +206,7 @@ async function expandInclude(raw, currentFile, ancestors, inFence, isOwnLine, ba
     } else {
       const section = findHeadingSection(content, region[1]);
       if (!section) {
-        warn(`Include region 或标题 "${region[1]}" 不存在：${url}，保留原指令`);
+        warn(ctx, `Include region 或标题 "${region[1]}" 不存在：${url}，保留原指令`);
         return null;
       }
       lines = lines.slice(section.start, section.end);
@@ -214,18 +216,18 @@ async function expandInclude(raw, currentFile, ancestors, inFence, isOwnLine, ba
     const start = range[1] ? parseInt(range[1], 10) : 1;
     const end = range[2] ? parseInt(range[2], 10) : lines.length;
     if (start < 1 || end < start || end > lines.length) {
-      warn(`Include 范围 ${range[0]} 越界：${url}，保留原指令`);
+      warn(ctx, `Include 范围 ${range[0]} 越界：${url}，保留原指令`);
       return null;
     }
     lines = lines.slice(start - 1, end);
   }
-  const expanded = await processSource(lines.join('\n'), file, [...ancestors, currentFile], inFence, base);
+  const expanded = await processSource(lines.join('\n'), file, [...ancestors, currentFile], inFence, ctx);
   return file.endsWith('.md') && isOwnLine && !inFence
     ? `<!-- @include-start: ${dirOf(file)} -->\n\n${expanded}\n\n<!-- @include-end -->`
     : expanded;
 }
 
-async function processSource(src, currentFile, ancestors, fenced, base) {
+async function processSource(src, currentFile, ancestors, fenced, ctx) {
   const lines = src.split('\n');
   const flags = [];
   let fence = null;
@@ -245,7 +247,7 @@ async function processSource(src, currentFile, ancestors, fenced, base) {
       // snippet 是块级规则，只处理围栏外独占一行的 <<<
       if (status === 'outside') {
         const snippet = SNIPPET_RE.exec(line);
-        if (snippet) return (await expandSnippet(snippet[1], currentFile, base)) ?? line;
+        if (snippet) return (await expandSnippet(snippet[1], currentFile, ctx)) ?? line;
       }
       if (!line.includes('<!--')) return line;
       const matches = [...line.matchAll(INCLUDE_RE)];
@@ -260,7 +262,7 @@ async function processSource(src, currentFile, ancestors, fenced, base) {
           ancestors,
           fenced || status === 'inside',
           isOwnLine,
-          base,
+          ctx,
         );
         result += line.slice(last, match.index) + (expanded ?? match[0]);
         last = match.index + match[0].length;
@@ -277,8 +279,16 @@ async function processSource(src, currentFile, ancestors, fenced, base) {
  * @param {string} sourcePath 当前文件的物理路径（相对站点根，决定相对路径基准）
  * @param {object} [options]
  * @param {string} [options.base='/'] 站点部署前缀，静态文件从 `${base}${file}` fetch
+ * @param {object} [options.adapters] 宿主适配器：resolveResource / fetcher 可与渲染层共用
+ * @param {function} [options.onResolveError] 加载/解析失败回调；给出后不再 console.warn
  * @returns {Promise<string>} 展开后的 Markdown
  */
-export function expandSource(source, sourcePath = '', { base = '/' } = {}) {
-  return processSource(stripFrontmatter(source), sourcePath, [], false, base);
+export function expandSource(source, sourcePath = '', { base = '/', adapters, onResolveError } = {}) {
+  const prefix = normalizeBase(base);
+  const ctx = {
+    resolveResource: adapters?.resolveResource ?? createResourceResolver(prefix),
+    fetcher: adapters?.fetcher ?? defaultFetcher,
+    onResolveError,
+  };
+  return processSource(stripFrontmatter(source), sourcePath, [], false, ctx);
 }

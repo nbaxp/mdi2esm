@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 
-import { expandSource } from '../src/source-expander.js';
+import { clearSourceCache, expandSource } from '../src/source-expander.js';
 
 const FILES = new Map([
   ['/snippets/demo.js', 'const a = 1;\nconst b = 2;\n'],
@@ -110,6 +110,50 @@ test('@include 的 region 未命中时按标题锚点截取章节', async () => 
   const out = await expandSource('<!-- @include: ./parts/headings.md#第一节 -->', 'guide/page.md');
   assert.match(out, /^<!-- @include-start: guide\/parts\/ -->\n\n\n一\n/);
   assert.equal(out.includes('第二节'), false);
+});
+
+test('adapters.fetcher / resolveResource 接管 fetch 与 URL 拼装', async () => {
+  const urls = [];
+  const fetcher = async (url) => {
+    urls.push(String(url));
+    return originalFetch(url);
+  };
+  const resolveResource = ({ file }) => `/virtual/${file}`;
+  await expandSource('<<< @/snippets/demo.js', 'guide/page.md', {
+    adapters: { fetcher, resolveResource },
+  });
+  assert.deepEqual(urls, ['/virtual/snippets/demo.js']);
+});
+
+test('空 base 使用站点根绝对 URL，不发相对 fetch', async () => {
+  clearSourceCache();
+  const urls = [];
+  const prevFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    urls.push(String(url));
+    return prevFetch(url);
+  };
+  await expandSource('<<< @/snippets/demo.js', 'guide/page.md', { base: '' });
+  globalThis.fetch = prevFetch;
+  assert.deepEqual(urls, ['/snippets/demo.js']);
+});
+
+test('加载失败清缓存可重试，并触发 onResolveError', async () => {
+  clearSourceCache();
+  let attempts = 0;
+  const errors = [];
+  const fetcher = async () => {
+    attempts += 1;
+    if (attempts === 1) return { ok: false, status: 503, text: async () => '' };
+    return { ok: true, status: 200, text: async () => 'const ok = true;' };
+  };
+  const options = { adapters: { fetcher }, onResolveError: (message) => errors.push(message) };
+  const directive = '<<< @/snippets/flaky.js';
+  assert.equal(await expandSource(directive, 'guide/page.md', options), directive);
+  assert.match(await expandSource(directive, 'guide/page.md', options), /const ok = true;/);
+  assert.equal(attempts, 2);
+  assert.equal(errors.length, 1);
+  clearSourceCache();
 });
 
 test('@include 递归展开，祖先链上的循环保留原指令', async () => {

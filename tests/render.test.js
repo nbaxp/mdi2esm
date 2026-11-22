@@ -111,6 +111,24 @@ test('内部链接不加 target 与图标', async () => {
   assert.equal(html.includes('vp-external-link-icon'), false);
 });
 
+test('根绝对路径也经 toHref，由宿主适配器决定 base 与路由', async () => {
+  const config = createConfig({
+    base: '/docs/',
+    adapters: {
+      toHref: ({ resolved, hash }) => `/docs/route/${resolved.replace(/\.md$/, '')}${hash}`,
+    },
+  });
+  const { html } = await renderMarkdown('[根绝对](/guide/index.md)', { config });
+  assert.match(html, /href="\/docs\/route\/guide\/index"/);
+});
+
+test('协议相对链接原样输出，不经 toHref', async () => {
+  const config = createConfig({ adapters: { toHref: () => '/SHOULD-NOT-APPEAR' } });
+  const { html } = await renderMarkdown('[协议相对](//x.com/a)', { config });
+  assert.match(html, /href="\/\/x\.com\/a"/);
+  assert.equal(html.includes('SHOULD-NOT-APPEAR'), false);
+});
+
 test('image =WxH 解析为 width/height 并剥离尺寸后缀', async () => {
   const { html } = await renderMarkdown('![a](img.png =200x300)');
   assert.match(html, /<img src="[^"]*img\.png"[^>]*width="200" height="300"/);

@@ -135,14 +135,14 @@ createApp({ render: () => h(component) }).mount(document.getElementById('content
 
 ## 部署路径（base）
 
-md 里的相对链接、图片、`<script setup>` 里的相对 import，最终 URL 都由 `createConfig({ base })` 决定。默认 `'/'`，即站点部署在域名根；放到子路径时传实际前缀：
+md 里的相对链接、图片、`<script setup>` 里的相对 import，以及 `<<<` / `@include` / 地图 GeoJSON 的静态资源 fetch，最终 URL 都由 `createConfig({ base })` 决定。默认 `'/'`，即站点部署在域名根；放到子路径时传实际前缀：
 
 ```js
 createConfig(); // ./guide/a.md → /guide/a
 createConfig({ base: '/docs/' }); // ./guide/a.md → /docs/guide/a
 ```
 
-`base` 不会出现在配置对象上——`createConfig` 内部把它编成 `adapters`（`toHref` / `toSrc` / `toScriptImport` / `scriptContext`），渲染层只读 `config.adapters`，不会出现两个真相来源。需要非标准规则（比如把 `index.md` 归一成目录、把图片改写到 `/public`）时，覆写对应那一个函数即可，其余仍按 `base` 生成：
+`base` 不会出现在配置对象上——`createConfig` 内部把它编成 `adapters`（`toHref` / `toSrc` / `toScriptImport` / `resolveResource` / `fetcher` / `scriptContext`），渲染层与库内 fetch 都只读 `config.adapters`，不会出现两个真相来源。`markdown.include.base` 未显式指定时继承同一个 `base`。需要非标准规则（比如把 `index.md` 归一成目录、把图片改写到 `/public`）时，覆写对应那一个函数即可，其余仍按 `base` 生成：
 
 ```js
 createConfig({
@@ -161,6 +161,8 @@ createConfig({
 KaTeX 的样式不属于路径配置，库也不注入 `<link>`：`katex/dist/katex.min.css` 由宿主自己引入（见上一节）。
 
 **裸 HTML 不参与路径改写**：Markdown 里的裸 HTML（`html: true` 会渲染）中的 `<a>` / `<img>` 不经过 `link_rewrite`，子路径/嵌套部署时其中的相对链接不会加 `base` 前缀。请在 Markdown 中用链接/图片语法，或自行改写裸 HTML。
+
+**库内 fetch 可接管**：`<<<` / `@include` 的静态文件与地图 GeoJSON 统一走 `adapters.resolveResource`（拼 URL）与 `adapters.fetcher`（默认全局 `fetch`）。SSR、带认证头、自定义缓存都可分别覆写；`onResolveError` 回调可替代默认告警（见 `expandSource`）。默认外链判定覆盖 http(s)、`mailto:`、`tel:`、`data:`、`blob:` 与 `//` 协议相对 URL，其余scheme 也原样返回。
 
 ## 样式
 

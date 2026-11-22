@@ -1,4 +1,5 @@
 // Markdown 渲染配置：宿主壳是唯一注入点，渲染层只读 config，不猜宿主环境。
+import { createResourceResolver, defaultFetcher, isExternal, normalizeBase, withBase } from './url.js';
 
 // 容器提示文案：VitePress 官方 locales[].container 的中英文默认值
 export const CONTAINER_LABELS = {
@@ -66,23 +67,27 @@ export const DEFAULT_CONFIG = {
 // URL 拼装只认 base 一个参数——根部署、子路径部署、mdoc 嵌套部署走同一条路。
 // 有非标准规则时，宿主在自己的 adapters 里覆写单个函数，createConfig 负责合并。
 export function createBaseAdapters(base = '/') {
-  const root = base.endsWith('/') ? base : `${base}/`;
-  const prefix = root.slice(0, -1); // '' 或 '/doc'
+  const prefix = normalizeBase(base); // '' 或 '/doc'
   return {
     toHref: ({ path, resolved, hash }) => {
-      const isDoc = /\.md$/i.test(path) || !/\.[a-z0-9]+$/i.test(path);
-      return `${prefix}/${isDoc ? resolved.replace(/\.md$/i, '') : resolved}${hash}`;
+      if (isExternal(path)) return path + hash;
+      // 只有 .md 去掉后缀；无扩展名路径（/api/users、目录）保持原样交给宿主
+      const isDoc = /\.md$/i.test(path);
+      return withBase(prefix, isDoc ? resolved.replace(/\.md$/i, '') : resolved) + hash;
     },
     toSrc: ({ src, resolved }) => {
-      if (/^[a-z]+:/i.test(src) || src.startsWith('//')) return src; // data: / 外链
-      if (src.startsWith('/')) return `${prefix}${src}`;
-      return `${prefix}/${resolved}`;
+      if (isExternal(src)) return src;
+      return withBase(prefix, resolved);
     },
     toScriptImport: ({ spec, resolved }) => {
-      if (spec.startsWith('.')) return `${prefix}/${resolved}`;
-      if (spec.startsWith('/')) return `${prefix}${spec}`;
-      return spec;
+      if (isExternal(spec)) return spec;
+      if (spec.startsWith('.')) return withBase(prefix, resolved);
+      if (spec.startsWith('/')) return withBase(prefix, spec);
+      return spec; // 裸包名交给 importmap
     },
+    // 库内 fetch（<<< / @include / 地图 GeoJSON）走这里，宿主可统一接管审计、认证、缓存
+    resolveResource: createResourceResolver(prefix),
+    fetcher: defaultFetcher,
     scriptContext: ({ frontmatter, params }) => ({ frontmatter: frontmatter ?? {}, params: params ?? {} }),
   };
 }
@@ -113,7 +118,8 @@ export function createConfig({ base = '/', adapters, ...overrides } = {}) {
       ...overrides.markdown,
       image: { ...DEFAULT_CONFIG.markdown.image, ...overrides.markdown?.image },
       toc: { ...DEFAULT_CONFIG.markdown.toc, ...overrides.markdown?.toc },
-      include: { ...DEFAULT_CONFIG.markdown.include, ...overrides.markdown?.include },
+      // include.base 未显式指定时继承同一个 base，避免渲染链接与 fetch 用不同前缀
+      include: { ...DEFAULT_CONFIG.markdown.include, base, ...overrides.markdown?.include },
     },
     labels: {
       container: overrides.labels?.container ?? CONTAINER_LABELS[key],

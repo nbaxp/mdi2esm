@@ -4,4 +4,4 @@ export { assertConfigCompatible, createConfig } from './config.js';
 export { ensureEmojiPlugin as ensureMarkdownReady, default as md } from './markdown-it.js';
 export { createMarkdownComponent } from './pipeline.js';
 export { buildOutline, renderMarkdown } from './render.js';
-export { expandSource } from './source-expander.js';
+export { clearSourceCache, expandSource } from './source-expander.js';

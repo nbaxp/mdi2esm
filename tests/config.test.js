@@ -12,7 +12,7 @@ import {
 } from '../src/config.js';
 import { buildScriptModuleSource, buildSetupModuleSource } from '../src/markdown-script.js';
 
-const ADAPTER_KEYS = ['toHref', 'toSrc', 'toScriptImport', 'scriptContext'];
+const ADAPTER_KEYS = ['toHref', 'toSrc', 'toScriptImport', 'resolveResource', 'fetcher', 'scriptContext'];
 
 test('配置：schema 与默认预设', () => {
   assert.deepEqual(Object.keys(DEFAULT_ADAPTERS).sort(), [...ADAPTER_KEYS].sort());
@@ -115,4 +115,37 @@ test('适配器：子路径下相对/绝对路径都带上 base', () => {
   assert.equal(toScriptImport({ spec: './h.js', resolved: 'guide/h.js' }), '/doc/guide/h.js');
   assert.equal(toScriptImport({ spec: '/abs.js', resolved: '' }), '/doc/abs.js');
   assert.equal(toScriptImport({ spec: 'vue', resolved: '' }), 'vue');
+});
+
+test('适配器：toHref 只去 .md 后缀，无扩展名与 .html 保持原样', () => {
+  const { toHref } = createBaseAdapters('/doc');
+  assert.equal(toHref({ path: './foo.md', resolved: 'guide/foo.md', hash: '' }), '/doc/guide/foo');
+  assert.equal(toHref({ path: 'guide/api/users', resolved: 'guide/api/users', hash: '' }), '/doc/guide/api/users');
+  assert.equal(toHref({ path: 'guide/a.html', resolved: 'guide/a.html', hash: '' }), '/doc/guide/a.html');
+});
+
+test('适配器：外链与协议相对 URL 原样，data/blob 也不拼 base', () => {
+  const { toSrc, toHref, toScriptImport } = createBaseAdapters('/doc');
+  for (const src of ['https://x.com/a.png', '//x.com/a.png', 'data:image/png;base64,AAA', 'blob:http://x/uuid']) {
+    assert.equal(toSrc({ src, resolved: src }), src);
+    assert.equal(toHref({ path: src, resolved: src, hash: '' }), src);
+    assert.equal(toScriptImport({ spec: src, resolved: src }), src);
+  }
+});
+
+test('适配器：空 base 仍产出绝对 URL，不再发相对 fetch', () => {
+  const { toSrc, toHref, resolveResource } = createBaseAdapters('');
+  assert.equal(toSrc({ src: 'a.png', resolved: 'guide/a.png' }), '/guide/a.png');
+  assert.equal(toHref({ path: './a.md', resolved: 'guide/a.md', hash: '' }), '/guide/a');
+  assert.equal(resolveResource({ file: 'guide/a.md', spec: './a.md' }), '/guide/a.md');
+  assert.equal(resolveResource({ file: 'x', spec: '//cdn/x.js' }), '//cdn/x.js');
+});
+
+test('配置：include.base 未指定时继承 base，显式指定优先', () => {
+  assert.equal(createConfig({ base: '/docs/' }).markdown.include.base, '/docs/');
+  assert.equal(
+    createConfig({ base: '/docs/', markdown: { include: { base: '/raw/' } } }).markdown.include.base,
+    '/raw/',
+  );
+  assert.equal(createConfig().markdown.include.base, '/');
 });

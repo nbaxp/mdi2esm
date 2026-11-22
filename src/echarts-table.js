@@ -7,6 +7,7 @@ import { computed, defineComponent, ref, watch } from 'vue';
 
 import { DEFAULT_HEIGHT, loadOption, useECharts } from './echarts.js';
 import { buildTableChartOption } from './table-chart.js';
+import { defaultFetcher, isExternal, resolvePath } from './url.js';
 
 const decodeJson = (value, fallback) => {
   try {
@@ -60,6 +61,9 @@ function mapSources(declared, configured) {
 
 export function createEChartsTableBlock(options = {}) {
   const resolved = { height: DEFAULT_HEIGHT, ...options };
+  const adapters = options.adapters ?? {};
+  const fetcher = adapters.fetcher ?? defaultFetcher;
+  const resolveResource = adapters.resolveResource ?? (({ file, spec }) => (isExternal(spec) ? spec : file));
 
   return defineComponent({
     name: 'EChartsTableBlock',
@@ -77,7 +81,9 @@ export function createEChartsTableBlock(options = {}) {
       async function prepareMap({ echarts, option, chart, stale }) {
         const declared = option.__mdiMapSource;
         delete option.__mdiMapSource;
-        const sources = mapSources(declared, resolved.mapTable?.sourceUrl);
+        const sources = mapSources(declared, resolved.mapTable?.sourceUrl).map((spec) =>
+          resolveResource({ file: resolvePath('', spec), spec, kind: 'map' }),
+        );
         const useSource = (source) => {
           if (source)
             option.series?.forEach((series) => {
@@ -96,7 +102,7 @@ export function createEChartsTableBlock(options = {}) {
         chart.setOption(mapLoadingOption(option.title), true);
         for (const url of sources) {
           try {
-            const response = await fetch(url, { referrerPolicy: 'no-referrer' });
+            const response = await fetcher(url, { referrerPolicy: 'no-referrer' });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const geoJson = await response.json();
             if (stale()) return;

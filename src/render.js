@@ -5,17 +5,10 @@ import { assertConfigCompatible, createRenderEnv, DEFAULT_ADAPTERS } from './con
 import md, { ensureCustomContainers, ensureSyntaxPlugins } from './markdown-it.js';
 import { normalizeHash } from './markdown-plugins.js';
 import { renderMath } from './math.js';
+import { isExternal, resolvePath } from './url.js';
 
-// 路径解析：'guide/./a.md' → 'guide/a.md'，处理 './' 与 '../'
-export const resolvePath = (base, rel) => {
-  const out = [];
-  for (const part of (base + rel).split('/')) {
-    if (part === '' || part === '.') continue;
-    if (part === '..') out.pop();
-    else out.push(part);
-  }
-  return out.join('/');
-};
+// 路径解析实现已收敛到 url.js，这里保留 re-export 兼容现有调用方
+export { resolvePath };
 
 // include.ts:32 的 rebase marker：被包含 .md 里的相对链接要按被包含文件的目录解析
 const REBASE_RE = /^[ \t]*<!-- @include-(?:start: (.*)|end) -->[ \t]*$/gm;
@@ -60,7 +53,9 @@ md.core.ruler.push('link_rewrite', (state) => {
           if (normalized) child.attrSet('href', normalized);
           continue;
         }
-        if (href.startsWith('/')) continue;
+        // data: / 协议相对 / 其他 scheme 一律原样，不交给宿主适配器
+        if (isExternal(href)) continue;
+        // 根绝对路径同样经 toHref，让宿主决定 base / 路由映射（例如 mdoc 的 /public 改写）
         const [path, rawHash] = href.split('#');
         const hash = rawHash ? normalizeHash(rawHash) : '';
         child.attrSet('href', adapters.toHref({ path, resolved: resolvePath(dir, path), hash }));
@@ -75,14 +70,14 @@ md.core.ruler.push('link_rewrite', (state) => {
           src = sizeMatch[1];
           child.attrSet('src', src);
         }
-        if (/^(https?:|mailto:|#|data:)/i.test(src)) continue;
+        if (isExternal(src) || src.startsWith('#')) continue;
         const resolved = src.startsWith('/') ? src : resolvePath(dir, src);
         child.attrSet('src', adapters.toSrc({ src, resolved }));
         if (lazyLoad) child.attrSet('loading', 'lazy');
       } else if (child.type === 'media') {
         let src = child.attrGet('src') ?? '';
         // 与图片同策略：协议 URL / data 原样，相对路径按 dir 解析后走 toSrc
-        if (/^(https?:|mailto:|#|data:)/i.test(src)) continue;
+        if (isExternal(src) || src.startsWith('#')) continue;
         const resolved = src.startsWith('/') ? src : resolvePath(dir, src);
         child.attrSet('src', adapters.toSrc({ src, resolved }));
       }

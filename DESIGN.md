@@ -59,20 +59,26 @@ Markdown 原文
 - **相对解析** `resolvePath(base, rel)`：把 `./`、`../` 折叠成规范化路径；
 - **形态归一化**：外链加 `target/rel`（外链图标交给 CSS 层，默认关闭）、`#anchor` 归一化、图片 `=WxH` 尺寸；`loading=lazy` 由 `config.markdown.image.lazyLoad` 控制，默认禁用。
 
-URL 的**拼装规则**交给 `config.adapters` 的四个函数（`src/config.js`）：
+所有 URL 相关的判定集中在 `src/url.js`（唯一真相来源）：`normalizeBase` / `withBase`（base 归一与拼接，空 base 也产出以 `/` 开头的绝对 URL）、`isExternal`（协议 URL / `//` / 其他 scheme 原样返回）、`resolvePath`、`createResourceResolver`（库内 fetch 的默认 URL 拼装）、`defaultFetcher`。渲染层的 `toHref/toSrc` 与库内 fetch（snippet / include / 地图 GeoJSON）共用这些函数，避免两套 base 语义与三套外链正则漂移。
 
-| 函数             | 输入                       | 职责                              |
-| ---------------- | -------------------------- | --------------------------------- |
-| `toHref`         | `{ path, resolved, hash }` | 链接 → 最终 URL（含路由形态）     |
-| `toSrc`          | `{ src, resolved }`        | 图片/资源 → 最终 URL              |
-| `toScriptImport` | `{ spec, resolved }`       | `<script>` 相对说明符 → 绝对 URL  |
-| `scriptContext`  | `{ frontmatter, params }`  | `<script setup>` 额外注入的上下文 |
+URL 的**拼装规则**交给 `config.adapters` 的六个函数（`src/config.js`）：
 
-`createBaseAdapters(base)` 把 `base` 归一化成 `root`/`prefix`，提供默认实现（子路径/嵌套部署走同一条路）；`createConfig` 用浅合并让宿主**只覆写单个函数**（如 mdoc 覆写 `toHref/toSrc` 做 index 归一化与 `/public` 改写）。
+| 函数              | 输入                       | 职责                                              |
+| ----------------- | -------------------------- | ------------------------------------------------- |
+| `toHref`          | `{ path, resolved, hash }` | 链接 → 最终 URL（含路由形态），根绝对路径同样进入 |
+| `toSrc`           | `{ src, resolved }`        | 图片/资源 → 最终 URL                              |
+| `toScriptImport`  | `{ spec, resolved }`       | `<script>` 相对说明符 → 绝对 URL                  |
+| `resolveResource` | `{ file, spec, kind }`     | `<<<` / `@include` / 地图 GeoJSON 的 fetch URL    |
+| `fetcher`         | `(url, init)`              | 所有库内静态资源 fetch（SSR / 认证 / 缓存可接管） |
+| `scriptContext`   | `{ frontmatter, params }`  | `<script setup>` 额外注入的上下文                 |
+
+`toHref` 只对 `.md` 去后缀；无扩展名路径（如 `/api/users`）与 `.html` 保持原样，路由语义完全交给宿主覆写。`resolveResource` 的 `kind` 取 `source` / `map`，宿主可按来源分流。`fetcher` 失败时 snippet/include 的缓存项会被清除，允许重试。
+
+`createBaseAdapters(base)` 把 `base` 归一化成 `prefix`，提供默认实现（子路径/嵌套部署走同一条路）；`createConfig` 用浅合并让宿主**只覆写单个函数**（如 mdoc 覆写 `toHref/toSrc` 做 index 归一化与 `/public` 改写）。`markdown.include.base` 未显式指定时继承 `base`，保证渲染链接与静态资源 fetch 用同一前缀。
 
 关键约束：**`base` 不作为字段出现在 config 上**，而是"编译"进 adapters——避免 `<base>`、config、适配器之间出现多个真相来源。默认实现只表达通用形态（`.md` 剥除），路由语义由宿主覆写决定。
 
-adapters 只接收路径/上下文字段（见上表），不接收每次渲染的 `env`；若宿主规则依赖 frontmatter 或路由状态，在覆写函数内用闭包捕获（或从 `scriptContext` 取 frontmatter/params）。
+adapters 只接收路径/上下文字段（见上表），不接收每次渲染的 `env`；若宿主规则依赖 frontmatter 或路由状态，在覆写函数内用闭包捕获（或从 `scriptContext` 取 frontmatter/params）。`configFingerprint`（单例冲突告警）只比对影响装配/渲染的静态字段；`adapters` / `base` / `include.base` 属于每次调用可按页传入的字段，不进指纹，同一进程不同 base 的多站点不会误告警。
 
 ### 2.5 脚本：`<script setup>` 与 `<script>`
 
@@ -202,4 +208,6 @@ adapters 只接收路径/上下文字段（见上表），不接收每次渲染�
 
 ## 4. 与宿主（mdoc）的集成要点
 
-宿主负责：`fetch` md 源文本、展开 `@include`、提供 `dir`（逻辑目录）与 `base`、覆写 `adapters`（路由规则）、提供 `Icon` 组件与可选依赖、把 `component` 挂进路由视图。库只负责把文本变成组件，并在需要时经 `adapters` 使用宿主规则。
+宿主负责：`fetch` md 源文本、提供 `dir`（逻辑目录）与 `base`、覆写 `adapters`（路由规则）、提供 `Icon` 组件与可选依赖、把 `component` 挂进路由视图。库只负责把文本变成组件，并在需要时经 `adapters` 使用宿主规则。
+
+`<<<` / `@include` 已由库自带浏览器端展开：宿主把当前文件相对站点根的物理路径作为 `sourcePath` 传给 `createMarkdownComponent`（或自行调用导出的 `expandSource`），展开的静态 fetch 走 `adapters.resolveResource` + `adapters.fetcher`，失败默认告警并保留原指令，可传 `onResolveError` 接管。宿主无需再保留一份展开实现。展开后的 `<!-- @include-start: dir -->` marker 由渲染层在 `link_rewrite` 里消费，按被包含文件目录解析相对链接。
