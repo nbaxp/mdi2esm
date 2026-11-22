@@ -78,6 +78,8 @@ URL 的**拼装规则**交给 `config.adapters` 的六个函数（`src/config.js
 
 关键约束：**`base` 不作为字段出现在 config 上**，而是"编译"进 adapters——避免 `<base>`、config、适配器之间出现多个真相来源。默认实现只表达通用形态（`.md` 剥除），路由语义由宿主覆写决定。
 
+文档站走另一条路径：宿主传 `createConfig({ paths })` 时，`createPathAdapters(paths)` 用 `src/paths.js` 的 `createPathResolver` 统一实现 [PATH-REDESIGN-v8.md](./PATH-REDESIGN-v8.md) 的四条公式与 §5 分类——`toHref` / `toSrc` 都收敛到 `resolver.resolve`，`resolveResource`（库内 fetch 走 `docStaticPath`）与 `toScriptImport`（脚本 import 只加 `routerBase`）也由同一 resolver 提供。`paths` 作为字段保留在 config 上供宿主自省；`fetcher` / `scriptContext` 与 base 模式共用，未传 `paths` 时仍走 `createBaseAdapters(base)`，两种模式互斥且都允许 `adapters` 定点覆写。
+
 adapters 只接收路径/上下文字段（见上表），不接收每次渲染的 `env`；若宿主规则依赖 frontmatter 或路由状态，在覆写函数内用闭包捕获（或从 `scriptContext` 取 frontmatter/params）。`configFingerprint`（单例冲突告警）只比对影响装配/渲染的静态字段；`adapters` / `base` / `include.base` 属于每次调用可按页传入的字段，不进指纹，同一进程不同 base 的多站点不会误告警。
 
 ### 2.5 脚本：`<script setup>` 与 `<script>`
@@ -123,7 +125,8 @@ adapters 只接收路径/上下文字段（见上表），不接收每次渲染�
 | 文件                          | 职责                                                                                                                                                                                                                    |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/index.js`                | 包入口，只导出公共 API                                                                                                                                                                                                  |
-| `src/config.js`               | `createConfig` / `createRenderEnv` / `createBaseAdapters` / 默认文案                                                                                                                                                    |
+| `src/config.js`               | `createConfig` / `createRenderEnv` / `createBaseAdapters` / `createPathAdapters` / 默认文案                                                                                                                             |
+| `src/paths.js`                | `DEFAULT_PATHS` / `join` / `splitUrl` / `createPathResolver`：v8 四条公式、路由解析、URL 分类、库内资源与脚本导入                                                                                                       |
 | `src/markdown-it.js`          | markdown-it 实例与插件装配、锚点/目录、容器、github-alerts、数学占位、图标短码、音视频嵌入、时间线                                                                                                                      |
 | `src/render.js`               | `renderMarkdown` / `buildOutline` / `link_rewrite`（链接、图片与音视频 src 重写 core 规则）                                                                                                                             |
 | `src/pipeline.js`             | `createMarkdownComponent`：frontmatter → 块提取 → 渲染 → 组件装配                                                                                                                                                       |
@@ -147,22 +150,27 @@ adapters 只接收路径/上下文字段（见上表），不接收每次渲染�
 
 ### 3.2 公共 API
 
-包入口共八个导出（`src/index.js`；完整用法与示例见 README）：
+包入口共十四个导出（`src/index.js`；完整用法与示例见 README）：
 
-- `createConfig({ base, adapters, locale, labels, markdown, mermaidDriver, echarts, ... })`
+- `createConfig({ base?, paths?, adapters, locale, labels, markdown, mermaidDriver, echarts, ... })`：`paths` 存在时走 v8 模型，否则走 `base` 模型
+- `createPathResolver(paths)` → `{ config, context, resolve, sourceUrl, resolveResource, toScriptImport }`
+- `createPathAdapters(paths)` → v8 模型的 `config.adapters`
+- `DEFAULT_PATHS` → v8 十项默认值
+- `joinPath(...segments)` → v8 路径拼接（模块内名为 `join`）
 - `renderMarkdown(body, { dir, config })` → `{ html, headings }`（**不等待 emoji 挂载**：首次渲染可能少 emoji，实时预览场景需先 `await ensureMarkdownReady()`；`createMarkdownComponent` 已内置该等待）
 - `createMarkdownComponent(source, dir, config, { frontmatter, params })` → `{ component, headings }`（渲染前会 `await ensureMarkdownReady()`）
 - `buildOutline(headings)` → 目录树
 - `highlightBlock(props)` → 独立代码块组件
 - `ensureMarkdownReady()` → `Promise<void>`（挂载可选的 markdown-it-emoji，幂等）
 - `assertConfigCompatible(config)` → 单例配置冲突告警（首次记录指纹，后续不同则 `console.warn`）
+- `expandSource(source, sourcePath, options)` / `clearSourceCache()` → 浏览器端 `<<<` / `@include` 展开与缓存清理
 - `md` → markdown-it 实例（供特殊扩展，一般不用）
 
 内部步骤（`resolvePath`、`maskFenceMarkers`、`renderMath`、`escapeInvalidInterpolations`、`extractTopLevelBlocks` 等）不视为稳定 API。公共 API 带 JSDoc，未发布 `.d.ts`。
 
 ### 3.3 关键流程（代码位置）
 
-- **配置注入**：`createConfig`（`config.js`）把 `base` 编进 `adapters`，展开默认值与宿主覆盖；`createRenderEnv` 生成每次渲染的 `env`。
+- **配置注入**：`createConfig`（`config.js`）在未传 `paths` 时把 `base` 编进 `adapters`，传 `paths` 时改用 `createPathAdapters`（`paths.js` 的四条公式），随后展开默认值与宿主覆盖；`createRenderEnv` 生成每次渲染的 `env`。
 - **渲染**：`renderMarkdown`（`render.js`）负责围栏保护、`md.render`、公式增强；插值转义在 `createMarkdownComponent` 编译前完成。链接/图片重写在 `link_rewrite`（`render.js` 的 `core.ruler.push`）里完成。
 - **组件**：`createMarkdownComponent`（`pipeline.js`）串起 frontmatter、块提取、emoji 就绪、渲染、脚本模块、样式注入、组件定义。
 - **脚本**：`hoistImports` / `buildSetupModuleSource` / `importModuleSource`（`markdown-script.js`）。
@@ -182,14 +190,14 @@ adapters 只接收路径/上下文字段（见上表），不接收每次渲染�
 - `package.json` 的 `exports`：`.`（`development` → `dist/index.js`，默认 → `dist/index.min.js`）、`./index`、`./index.min`、`./index.css`、`./index.min.css`、`./package.json`。
 - **dependencies**：markdown-it 栈（`markdown-it` / `@mdit/*` / `@mdit-vue/*` / `markdown-it-cjk-friendly`）与 `prismjs`（构建期内联进产物）；**peerDependencies**：`vue`、`vue-style-runtime`（宿主提供，产物静态导入）；可选 peer：markdown-it-emoji、katex、mermaid、pele、echarts、medium-zoom、@iconify/vue（依赖清单与脚本见 README）。
 - **浏览器基线**：原生 ESM、动态 `import()`、Blob URL / `URL.createObjectURL`、importmap（可选）、CSS 自定义属性；宿主 Vue 必须是**含模板编译器**的构建（`compile` 需要）。
-- **体积**（v1.0.1，含表格转图表 / 目录增强 / 时间线 / 音视频；内联 Prism 核心 + 常用语言与 markdown-it 栈；CSS 整文件引入官方 VitePress 6 个样式）：`dist/index.js` ≈ 468 KB、`dist/index.min.js` ≈ 322 KB、`dist/index.css` ≈ 43 KB、`dist/index.min.css` ≈ 38 KB（实测字节 479814 / 329927 / 44186 / 39345）；重依赖（KaTeX / Mermaid / Pele / ECharts / medium-zoom）不内联，按需动态加载。
+- **体积**（当前版本，含表格转图表 / 目录增强 / 时间线 / 音视频；内联 Prism 核心 + 常用语言与 markdown-it 栈；CSS 整文件引入官方 VitePress 6 个样式）：`dist/index.js` ≈ 501 KiB、`dist/index.min.js` ≈ 345 KiB、`dist/index.css` ≈ 47 KiB、`dist/index.min.css` ≈ 42 KiB（实测字节 513077 / 353200 / 47914 / 42609）；重依赖（KaTeX / Mermaid / Pele / ECharts / medium-zoom）不内联，按需动态加载。
 
 ### 3.6 已知边界（实现现状）
 
 - **单例限制（实现现状，非 SPA 必然）**：`md` 是模块级单例，**一个进程只服务一套配置**。宿主典型场景（SPA 单页内单实例）不受影响；真正把配置锁死成“首份生效”的只有三处改了 `md` 实例本身的操作——`mark/sub/sup` 的 `ruler.disable`（首渲染后锁定）、自定义容器累积注册（同名以先注册者为准）、emoji 的 `md.use`（只挂一次且异步）；其余配置（`dir` / `adapters` / `level` / `lineNumbers` 等）都经每次渲染的 `env` 隔离，本身可多配置共存。`assertConfigCompatible(config)` 首次记录行为指纹（locale / markdown 开关 / mermaidDriver / 容器等，不含 adapters 函数引用），后续切到不同配置时 `console.warn` 且仅首份生效。因此 SPA 多实例、测试隔离、热更新、多站点复用受此限制——这是**可偿还的实现债**（中期方向 `createMarkdownRenderer(config)` 工厂，每实例独立 md），不是架构必然。
 - **无 SSR**：渲染在浏览器完成，产物是客户端组件。
 - **只支持一个顶层 `<script>`**：`<script setup>` 与普通 `<script>` 互斥，不能并存；第二个及以后的 `<script>` 留在正文（`html: true` 下作为原始 HTML 输出，不执行）。
-- **默认路由语义有限**：`createBaseAdapters` 只剥 `.md`、不归一化 `index`；路由规则由宿主覆写（见 README 的 mdoc 示例）。
+- **base 模型默认路由语义有限**：`createBaseAdapters` 只剥 `.md`、不归一化 `index`；路由规则由宿主覆写（见 README 的 mdoc 示例）。文档站请用 `createConfig({ paths })`：v8 模型内置语言段识别、`index` 归一、尾斜杠与资源分流，规范见 `PATH-REDESIGN-v8.md`。
 - **`<base>` 不参与**：路径前缀由 `adapters` 显式计算，不依赖文档 `<base>`（`<base>` 无法覆盖相对解析与 script 绝对化，见 README 部署路径章节）。
 - **脚本 import 用正则解析**（`IMPORT_RE`，仅行首单行）：
   - 支持：`import default / { named } / * as ns from 'spec'`、side-effect `import 'spec'`；
@@ -209,5 +217,7 @@ adapters 只接收路径/上下文字段（见上表），不接收每次渲染�
 ## 4. 与宿主（mdoc）的集成要点
 
 宿主负责：`fetch` md 源文本、提供 `dir`（逻辑目录）与 `base`、覆写 `adapters`（路由规则）、提供 `Icon` 组件与可选依赖、把 `component` 挂进路由视图。库只负责把文本变成组件，并在需要时经 `adapters` 使用宿主规则。
+
+走 v8 路径模型时，宿主改为注入 `paths`（不再需要 `base` / `dir` 推导路径）：站点级 `routerBase` / `docsRouterPath` / `docStaticPath` / `defaultLang` / `langs` / 各开关，以及当前页 `lang` / `routeFullPath`；按语言标识命名 md 目录，从 `docStaticPath` 同时提供 md 与文档资源（图片等共享、不分语言），并让该静态映射优先于 SPA 路由回退。当前 md 的 URL 用 `createPathResolver(paths).sourceUrl()` 取得；导航拦截（`navigate`）完全由宿主实现，库不参与。详见 `PATH-REDESIGN-v8.md`。
 
 `<<<` / `@include` 已由库自带浏览器端展开：宿主把当前文件相对站点根的物理路径作为 `sourcePath` 传给 `createMarkdownComponent`（或自行调用导出的 `expandSource`），展开的静态 fetch 走 `adapters.resolveResource` + `adapters.fetcher`，失败默认告警并保留原指令，可传 `onResolveError` 接管。宿主无需再保留一份展开实现。展开后的 `<!-- @include-start: dir -->` marker 由渲染层在 `link_rewrite` 里消费，按被包含文件目录解析相对链接。

@@ -9,6 +9,26 @@ A markdown-it wrapper with common plugins integrated. It renders Markdown into V
 
 > 这份 README 是包文档；可编辑的能力演示在同目录 `demo.md`，demo 运行时渲染的就是它。基础语法、容器、GitHub alerts、脚注、任务列表、图标与 emoji 短码、CJK 混排、属性、目录、代码高亮、数学、图表（含表格转图表）、图片缩放，以及宿主注入的组件（`<Badge>` / `<Icon>`）和 `<script setup>` 都在 `demo.md` 里。
 
+## 主要特点
+
+- **VitePress 主要语法**：标题锚点与 `{#id}` 自定义锚点、frontmatter、GitHub 风格表格、emoji、任务列表、脚注、`[[toc]]` 目录、自定义容器与 GitHub alerts、代码高亮 / 行高亮 / 聚焦 / diff / 行号、代码片段导入与代码组、数学公式（KaTeX）、图片懒加载，以及 VitePress 风格的类名与样式。
+- **CherryMarkdown 主要语法**：多列布局与选项卡、时间线（`:::timeline`）、音视频嵌入（`!video[]()` / `!audio[]()`）、表格配图（ECharts）、Mermaid 图表，以及 `<<<` / `@include` 片段包含。
+- **Iconify 动态图标**：md 里写 `:prefix-icon-name:` 短码即渲染成 `<Icon icon="prefix:name">`，图标数据由宿主的 Iconify 仓库提供，包内不内置图标集。
+- **PrismJS 替代 Shiki**：代码高亮改用 Prism 核心 + 常用语言，构建期内联进产物、同步渲染，宿主无需安装高亮库。
+- **Pele 驱动 Mermaid**：`mermaidDriver` 默认 `'pele'`，可切回原生 `'mermaid'`；两者都是可选 peer，按需动态加载。
+- **md 里写 Vue**：单份 md 可含一个顶层 `<script setup>` 或 `<script>`，在浏览器运行时编译成 Vue 组件，相对 `import` 提升为浏览器原生 ESM，frontmatter / `params` 注入作用域；解析失败降级为纯 HTML 渲染。
+
+产物大小（`npm run build` 实测，KiB 按 1024 字节折算）：
+
+| 产物                 | 字节    | 约 KiB |
+| -------------------- | ------- | ------ |
+| `dist/index.js`      | 513,077 | 501    |
+| `dist/index.min.js`  | 353,200 | 345    |
+| `dist/index.css`     | 47,914  | 47     |
+| `dist/index.min.css` | 42,609  | 42     |
+
+核心 markdown 栈与 Prism 内联在上面四个产物里；KaTeX / Mermaid / Pele / ECharts / medium-zoom 是可选 peer，按需动态加载，不计入此体积。
+
 ## 环境要求
 
 - Node.js >= 20（见 `package.json` 的 `engines`）。
@@ -133,16 +153,50 @@ createApp({ render: () => h(component) }).mount(document.getElementById('content
 
 推 `v*` Tag 时 GitHub Actions（`.github/workflows/publish.yml` 的 `pages` job）会构建并把 dist 部署到 `gh-pages` 分支（仓库 Pages 源需指向 gh-pages / root）。
 
-## 部署路径（base）
+## 部署路径
 
-md 里的相对链接、图片、`<script setup>` 里的相对 import，以及 `<<<` / `@include` / 地图 GeoJSON 的静态资源 fetch，最终 URL 都由 `createConfig({ base })` 决定。默认 `'/'`，即站点部署在域名根；放到子路径时传实际前缀：
+库有两套互斥的路径模型：传 `paths` 时走文档站路径模型（四条公式分别处理 md 源文件、文档链接、文档资源与公共资源）；未传时走通用的 `base` 模型。
+
+### v8 路径模型（`paths`）
+
+文档站（多语言 md、语言目录、文档路由与静态资源分离）使用 `createConfig({ paths })`。`paths` 字段为 `i18nEnabled` / `omitDefaultLang` / `urlTransformEnabled` / `routerBase` / `docsRouterPath` / `docStaticPath` / `defaultLang` / `langs` / `lang` / `routeFullPath`，默认值见导出的 `DEFAULT_PATHS`。四条公式：
+
+```text
+md 源文件  = join(routerBase, docStaticPath, lang, docFilePath + '.md')
+文档链接   = join(docsRouterPath, routeLang, 去 .md 并归一 index 的 resolvedPath)
+文档资源   = join(routerBase, docStaticPath, resolvedPath)   // 相对 URL，不含 lang
+公共资源   = join(routerBase, path)                         // 绝对 URL
+```
+
+```js
+createConfig({
+  paths: {
+    i18nEnabled: true,
+    routerBase: '/app/',
+    docsRouterPath: '/help',
+    docStaticPath: '/content',
+    defaultLang: 'zh-CN',
+    langs: ['zh-CN', 'en-US'], // 有效语言标识集合，不是映射表
+    lang: 'zh-CN', // 也可留空，由 routeFullPath 首段推导
+    routeFullPath: '/help/guide/',
+  },
+});
+// 当前 md：/app/content/zh-CN/guide/index.md
+// ./intro.md → /help/guide/intro；./img/a.png → /app/content/guide/img/a.png；/img/logo.png → /app/img/logo.png
+```
+
+`lang` 同时是 URL 段和 md 物理目录名，默认语言也有独立目录；`omitDefaultLang` 只影响路由，不影响 md 目录。`.md` 结尾（相对或根绝对）一律是文档链接，其余相对 URL 是文档资源、绝对 URL 是公共资源；文档目录链接保留尾斜杠。库内 fetch（`<<<` / `@include` / 地图 GeoJSON）走 `resolveResource`，与文档资源同走 `docStaticPath` 且不带 `lang`；`<script setup>` 的 import 经 `toScriptImport` 只加 `routerBase`。
+
+### base 模型（默认）
+
+未传 `paths` 时，md 里的相对链接、图片、`<script setup>` 里的相对 import，以及 `<<<` / `@include` / 地图 GeoJSON 的静态资源 fetch，最终 URL 都由 `createConfig({ base })` 决定。默认 `'/'`，即站点部署在域名根；放到子路径时传实际前缀：
 
 ```js
 createConfig(); // ./guide/a.md → /guide/a
 createConfig({ base: '/docs/' }); // ./guide/a.md → /docs/guide/a
 ```
 
-`base` 不会出现在配置对象上——`createConfig` 内部把它编成 `adapters`（`toHref` / `toSrc` / `toScriptImport` / `resolveResource` / `fetcher` / `scriptContext`），渲染层与库内 fetch 都只读 `config.adapters`，不会出现两个真相来源。`markdown.include.base` 未显式指定时继承同一个 `base`。需要非标准规则（比如把 `index.md` 归一成目录、把图片改写到 `/public`）时，覆写对应那一个函数即可，其余仍按 `base` 生成：
+`base` 不会出现在配置对象上（`paths` 模式另见上节）——`createConfig` 内部把它编成 `adapters`（`toHref` / `toSrc` / `toScriptImport` / `resolveResource` / `fetcher` / `scriptContext`），渲染层与库内 fetch 都只读 `config.adapters`，不会出现两个真相来源。`markdown.include.base` 未显式指定时继承同一个 `base`。需要非标准规则（比如把 `index.md` 归一成目录、把图片改写到 `/public`）时，覆写对应那一个函数即可，其余仍按 `base` 生成：
 
 ```js
 createConfig({
@@ -244,12 +298,14 @@ const { html, lang, ok } = highlightBlock(code, 'ts', { meta: '{2,4-5}' });
 
 ## 公共 API
 
-包入口共八个导出：
+包入口共十四个导出：
 
 - 配置：`createConfig`、`assertConfigCompatible`（单例配置冲突告警）
+- v8 路径模型：`createPathResolver`、`createPathAdapters`、`DEFAULT_PATHS`、`joinPath`（以 `joinPath` 暴露的 `join` 实现）
 - 渲染：`renderMarkdown`（markdown → HTML，KaTeX 已内部渲染）、`createMarkdownComponent`（markdown → Vue 组件）、`buildOutline`
 - 代码块：`highlightBlock`
 - 就绪：`ensureMarkdownReady`（挂载可选 emoji，幂等）
+- 源展开：`expandSource`、`clearSourceCache`
 - 底层：`md`（共享的 markdown-it 实例，需要自己 `parse` token 时用）
 
 图表相关配置：`mermaidDriver`（`pele` | `mermaid`）与 `echarts: { height }`（默认 400）。

@@ -1,4 +1,5 @@
 // Markdown 渲染配置：宿主壳是唯一注入点，渲染层只读 config，不猜宿主环境。
+import { createPathResolver } from './paths.js';
 import { createResourceResolver, defaultFetcher, isExternal, normalizeBase, withBase } from './url.js';
 
 // 容器提示文案：VitePress 官方 locales[].container 的中英文默认值
@@ -92,6 +93,21 @@ export function createBaseAdapters(base = '/') {
   };
 }
 
+// v8 路径模型适配器：宿主传 paths 时，URL 解析改走 PATH-REDESIGN-v8.md 的四条公式。
+// toHref/toSrc 都收敛到 resolver.resolve（§5 分类），toScriptImport/resolveResource 走
+// resolver 的对应规则；fetcher / scriptContext 与 base 模式保持一致。
+export function createPathAdapters(paths) {
+  const resolver = createPathResolver(paths);
+  return {
+    toHref: ({ path, hash }) => resolver.resolve(path + hash),
+    toSrc: ({ src }) => resolver.resolve(src),
+    toScriptImport: (ctx) => resolver.toScriptImport(ctx),
+    resolveResource: (ctx) => resolver.resolveResource(ctx),
+    fetcher: defaultFetcher,
+    scriptContext: ({ frontmatter, params }) => ({ frontmatter: frontmatter ?? {}, params: params ?? {} }),
+  };
+}
+
 // 根部署的适配器，作为渲染层没拿到 config 时的兜底
 export const DEFAULT_ADAPTERS = createBaseAdapters('/');
 
@@ -104,22 +120,29 @@ const localeKey = (locale) =>
 
 // 合并宿主覆盖：base 在这里编成 adapters，配置对象上不出现 base 字段；
 // locale 决定默认文案，宿主可用 labels / adapters 覆盖
-export function createConfig({ base = '/', adapters, ...overrides } = {}) {
+export function createConfig({ base = '/', adapters, paths, ...overrides } = {}) {
   const locale = overrides.locale ?? DEFAULT_CONFIG.locale;
   const key = localeKey(locale);
   // 宿主只覆写单个函数；显式写 undefined 不算覆写，避免把默认实现顶掉
   const patch = adapters ? Object.fromEntries(Object.entries(adapters).filter(([, fn]) => fn != null)) : {};
+  // paths 存在时走 v8 路径模型，否则保持 base 模式；两者都允许 adapters 定点覆写
+  const baseAdapters = paths ? createPathAdapters(paths) : createBaseAdapters(base);
   return {
     ...DEFAULT_CONFIG,
     ...overrides,
     locale,
+    paths: paths ?? null,
     markdown: {
       ...DEFAULT_CONFIG.markdown,
       ...overrides.markdown,
       image: { ...DEFAULT_CONFIG.markdown.image, ...overrides.markdown?.image },
       toc: { ...DEFAULT_CONFIG.markdown.toc, ...overrides.markdown?.toc },
       // include.base 未显式指定时继承同一个 base，避免渲染链接与 fetch 用不同前缀
-      include: { ...DEFAULT_CONFIG.markdown.include, base, ...overrides.markdown?.include },
+      include: {
+        ...DEFAULT_CONFIG.markdown.include,
+        base: paths ? (paths.routerBase ?? '/') : base,
+        ...overrides.markdown?.include,
+      },
     },
     labels: {
       container: overrides.labels?.container ?? CONTAINER_LABELS[key],
@@ -130,7 +153,7 @@ export function createConfig({ base = '/', adapters, ...overrides } = {}) {
       ...overrides.echarts,
       mapTable: { ...DEFAULT_CONFIG.echarts.mapTable, ...overrides.echarts?.mapTable },
     },
-    adapters: { ...createBaseAdapters(base), ...patch },
+    adapters: { ...baseAdapters, ...patch },
   };
 }
 
