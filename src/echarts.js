@@ -28,8 +28,10 @@ export async function loadOption(code) {
 // 图表实例的通用生命周期：load echarts → init → setOption，跟随暗色主题重建、
 // 容器尺寸变化 resize、卸载 dispose。el 是组件模板里的容器 ref；
 // getOption 返回完整 option；sourceText 是降级时展示的源码。
+// prepare 可选：拿到 echarts 实例与刚 init 的 chart 后、setOption 前的异步钩子
+// （地图用它 fetch GeoJSON → registerMap，并按加载/失败态直接 setOption）。
 // 返回 { failed, source, paint }：paint 供 option 变化时重绘。
-export function useECharts(el, height, getOption, { sourceText } = {}) {
+export function useECharts(el, height, getOption, { sourceText, prepare } = {}) {
   const failed = ref(null);
   const source = ref('');
   const chart = shallowRef(null);
@@ -50,7 +52,12 @@ export function useECharts(el, height, getOption, { sourceText } = {}) {
       if (!option || typeof option !== 'object') throw new Error('empty option');
       chart.value?.dispose();
       chart.value = echarts.init(element, themeClass);
-      chart.value.setOption(option);
+      if (prepare) {
+        // prepare 负责最终 setOption（地图要先 fetch + registerMap，再画完整 option 或状态页）
+        await prepare({ echarts, option, chart: chart.value, stale: () => current !== seq.n });
+      } else {
+        chart.value.setOption(option);
+      }
       failed.value = null;
       source.value = '';
     } catch (err) {

@@ -12,6 +12,7 @@ import { ensureEmojiPlugin } from './markdown-it.js';
 import { createScriptModule, createSetup } from './markdown-script.js';
 import { createMermaidBlock } from './mermaid.js';
 import { escapeInvalidInterpolations, renderMarkdown } from './render.js';
+import { expandSource } from './source-expander.js';
 
 // 多根（Fragment）组件的 this.$el 只指向第一个根节点；这里从 subTree 收集全部根元素，
 // 供 mountImageZoom 等需要遍历组件 DOM 的逻辑使用。
@@ -104,10 +105,19 @@ function mergeScriptOptions(options, def) {
  * @param {string} source Markdown 原文
  * @param {string} dir Markdown 文件所在目录（相对站点根，用于相对链接解析）
  * @param {object} config 渲染配置（由宿主壳经 createConfig 构造）
+ * @param {object} [options]
+ * @param {object} [options.frontmatter] 宿主已解析的 frontmatter（优先于内置解析）
+ * @param {object} [options.params] 页面参数，供 <script setup> 使用
+ * @param {string} [options.sourcePath] 当前文件相对站点根的物理路径；提供时在渲染前展开 <<< / @include
  * @returns {Promise<object|null>} 组件定义；空正文返回 null
  */
-export async function createMarkdownComponent(source, dir, config, { frontmatter, params } = {}) {
+export async function createMarkdownComponent(source, dir, config, { frontmatter, params, sourcePath } = {}) {
   assertConfigCompatible(config);
+  // 浏览器端 <<< / @include 展开：仅当宿主给出 sourcePath 时启用（默认行为不变）。
+  // 展开在 frontmatter 解析之前完成，stripFrontmatter 由 expandSource 内部负责。
+  if (sourcePath != null) {
+    source = await expandSource(source, sourcePath, { base: config?.markdown?.include?.base ?? '/' });
+  }
   // frontmatter：宿主显式传入优先，否则用（可替换的）内置子集解析器
   const parse = config?.markdown?.frontmatterParser ?? parseFrontmatter;
   const parsed = parse(source);

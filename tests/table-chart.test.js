@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { renderMarkdown } from '../src/index.js';
-import { buildTableChartOption } from '../src/table-chart.js';
+import { buildTableChartOption, normalizeProvinceName } from '../src/table-chart.js';
 
 const SOURCE = `|:line: {title: {text: '销量'}} | Q1 | Q2 |
 | --- | --- | --- |
@@ -237,4 +237,61 @@ test('buildTableChartOption：非数值转 null，用户 xAxis 不被覆盖', ()
   const option = buildTableChartOption('bar', { xAxis: { type: 'value' } }, ['Q1'], [['A', 'x']]);
   assert.deepEqual(option.series[0].data, [null]);
   assert.deepEqual(option.xAxis, { type: 'value' });
+});
+
+test('buildTableChartOption：map 用省名归一化 + visualMap，默认 china', () => {
+  const option = buildTableChartOption(
+    'map',
+    { title: '中国地图' },
+    ['数值'],
+    [
+      ['北京', '100'],
+      ['上海', '200'],
+      ['广东', '300'],
+    ],
+  );
+  assert.equal(option.series[0].type, 'map');
+  assert.equal(option.series[0].map, 'china');
+  assert.equal(option.series[0].roam, true);
+  assert.deepEqual(option.series[0].data, [
+    { name: '北京市', value: 100 },
+    { name: '上海市', value: 200 },
+    { name: '广东省', value: 300 },
+  ]);
+  assert.equal(option.visualMap.min, 100);
+  assert.equal(option.visualMap.max, 300);
+  assert.equal(option.__mdiMapSource, '');
+});
+
+test('buildTableChartOption：map 声明 mapDataSource 透传给组件，不泄漏到 option', () => {
+  const url = 'https://geo.datav.aliyun.com/areas_v3/bound/110000_full.json';
+  const option = buildTableChartOption('map', { title: '北京地图', mapDataSource: url }, ['数值'], [['海淀区', '120']]);
+  assert.equal(option.__mdiMapSource, url);
+  assert.equal(option.mapDataSource, undefined);
+  assert.equal(option.series[0].map, url);
+  assert.deepEqual(option.series[0].data, [{ name: '海淀区', value: 120 }]);
+});
+
+test('buildTableChartOption：map 用户 visualMap 不被覆盖', () => {
+  const visualMap = { min: 0, max: 1000, orient: 'vertical' };
+  const option = buildTableChartOption('map', { visualMap }, [], [['北京', '100']]);
+  assert.deepEqual(option.visualMap, visualMap);
+});
+
+test('normalizeProvinceName：简称/全称/无匹配', () => {
+  assert.equal(normalizeProvinceName('北京'), '北京市');
+  assert.equal(normalizeProvinceName(' 内蒙古 '), '内蒙古自治区');
+  assert.equal(normalizeProvinceName('香港'), '香港特别行政区');
+  assert.equal(normalizeProvinceName('北京市'), '北京市');
+  assert.equal(normalizeProvinceName('海淀区'), '海淀区');
+});
+
+test('表格转图表：:map: 声明渲染成 EChartsTableBlock type=map', async () => {
+  const source = `|:map: {"title": "中国地图", "mapDataSource": "https://x/y.json"} | 数值 |
+| --- | --- |
+| 北京 | 100 |`;
+  const { html } = await renderMarkdown(source);
+  assert.match(html, /<EChartsTableBlock type="map" /);
+  // options 是 JS 字面量而非 JSON，这里只校验 mapDataSource 已编码进属性
+  assert.match(decodeURIComponent(/options="([^"]*)"/.exec(html)[1]), /mapDataSource/);
 });

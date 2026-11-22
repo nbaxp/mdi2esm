@@ -387,6 +387,143 @@ md.renderer.rules.timeline_item = (tokens, idx, options, env) => {
 
 md.renderer.rules.timeline_close = () => '</div></div>\n';
 
+// 对齐 / 多列 / 选项卡：对齐 cherry 的 ::: 布局语法（共用一套关键字）。
+// 必须在 plugin-container 之前注册，避免 ::: center 等被通用容器规则抢先解析。
+const LAYOUT_ALIGN = {
+  left: 'left',
+  l: 'left',
+  center: 'center',
+  c: 'center',
+  right: 'right',
+  r: 'right',
+  justify: 'justify',
+  j: 'justify',
+};
+const LAYOUT_OPEN_RE = /^ {0,3}::: ?(left|center|right|justify|l|c|r|j|cols|2cols|3cols|tabs|t)(?:[ \t]+(.*))?$/;
+const LAYOUT_SEP_RE = /^ {0,3}::(?:[ \t]+(.*))?$/;
+const LAYOUT_CLOSE_RE = /^ {0,3}:::[ \t]*$/;
+const FENCE_RE = /^ {0,3}(`{3,}|~{3,})/;
+
+function layoutAlign(value) {
+  const first = String(value ?? '')
+    .trim()
+    .split(/\s+/)[0]
+    .toLowerCase();
+  return LAYOUT_ALIGN[first] ?? '';
+}
+
+function layoutRule(state, startLine, endLine, silent) {
+  const startText = state.src.slice(state.bMarks[startLine] + state.tShift[startLine], state.eMarks[startLine]);
+  const openMatch = LAYOUT_OPEN_RE.exec(startText);
+  if (!openMatch) return false;
+  const keyword = openMatch[1];
+  const kind = keyword === 'tabs' || keyword === 't' ? 'tabs' : LAYOUT_ALIGN[keyword] ? 'align' : 'cols';
+  const align = kind === 'align' ? LAYOUT_ALIGN[keyword] : layoutAlign(openMatch[2]);
+
+  let closeLine = -1;
+  const blocks = [];
+  let current = { lines: [], title: '', firstLine: -1, lastLine: -1 };
+  let fence = null;
+  const flush = (endLineExclusive) => {
+    if (current.lines.length || current.title) {
+      current.lastLine = endLineExclusive;
+      blocks.push(current);
+    }
+  };
+  for (let line = startLine + 1; line < endLine; line += 1) {
+    const text = state.src.slice(state.bMarks[line] + state.tShift[line], state.eMarks[line]);
+    const fenceMatch = FENCE_RE.exec(text);
+    if (fence) {
+      current.lines.push(text);
+      if (
+        fenceMatch &&
+        fenceMatch[1][0] === fence.char &&
+        fenceMatch[1].length >= fence.len &&
+        /^ {0,3}[`~]+\s*$/.test(text)
+      ) {
+        fence = null;
+      }
+      continue;
+    }
+    if (fenceMatch) {
+      if (current.firstLine === -1) current.firstLine = line;
+      fence = { char: fenceMatch[1][0], len: fenceMatch[1].length };
+      current.lines.push(text);
+      continue;
+    }
+    if (LAYOUT_CLOSE_RE.test(text)) {
+      closeLine = line;
+      break;
+    }
+    const sep = LAYOUT_SEP_RE.exec(text);
+    if (sep && kind !== 'align') {
+      flush(line);
+      current = {
+        lines: [],
+        title: kind === 'tabs' ? String(sep[1] ?? '').trim() : '',
+        firstLine: line + 1,
+        lastLine: -1,
+      };
+      continue;
+    }
+    if (current.firstLine === -1) current.firstLine = line;
+    current.lines.push(text);
+  }
+  if (closeLine === -1) return false; // 未闭合：交回普通 markdown
+  flush(closeLine);
+  if (silent) return true;
+
+  const open = state.push('layout_open', 'div', 1);
+  open.block = true;
+  open.meta = { kind, align, count: blocks.length, titles: blocks.map((b) => b.title), startLine };
+  open.map = [startLine, closeLine + 1];
+  for (const block of blocks) {
+    const cellOpen = state.push('layout_cell_open', 'div', 1);
+    cellOpen.block = true;
+    cellOpen.meta = { kind, align, title: block.title };
+    // 子块在 block 阶段就地 tokenize 进主流：脚注引用才能参与 core inline / footnoteTail
+    if (block.lines.length) {
+      const from = block.firstLine;
+      const to = block.lastLine;
+      state.md.block.tokenize(state, from, to);
+    }
+    const cellClose = state.push('layout_cell_close', 'div', -1);
+    cellClose.block = true;
+    cellClose.meta = { kind };
+  }
+  const close = state.push('layout_close', 'div', -1);
+  close.block = true;
+  close.meta = { kind };
+  state.line = closeLine + 1;
+  return true;
+}
+md.block.ruler.before('fence', 'layout', layoutRule, { alt: ['paragraph', 'reference', 'blockquote', 'list'] });
+
+md.renderer.rules.layout_open = (tokens, idx) => {
+  const { kind, align, count, titles, startLine } = tokens[idx].meta;
+  if (kind === 'align') return `<div class="mdi-align mdi-align-${align}">\n`;
+  if (kind === 'cols') return `<div class="mdi-cols mdi-cols-${count}${align ? ` mdi-cols-align-${align}` : ''}">\n`;
+  let radios = '';
+  let labels = '';
+  for (let i = 0; i < count; i += 1) {
+    const id = `mdi-tabs-${startLine}-${i}`;
+    radios += `<input type="radio" name="mdi-tabs-${startLine}" id="${id}"${i === 0 ? ' checked' : ''}>`;
+    labels += `<label for="${id}">${md.utils.escapeHtml(titles[i] || `Tab ${i + 1}`)}</label>`;
+  }
+  return `<div class="mdi-tabs${align ? ` mdi-tabs-align-${align}` : ''}">${radios}<div class="mdi-tab-labels">${labels}</div><div class="mdi-tab-panels">\n`;
+};
+
+md.renderer.rules.layout_cell_open = (tokens, idx) => {
+  const { kind, align } = tokens[idx].meta;
+  if (kind === 'align') return ''; // 对齐块直接内联内容，无需包裹元素
+  if (kind === 'cols') return `<div class="mdi-col">\n`;
+  return `<div class="mdi-tab-panel${align ? ` mdi-tab-panel-${align}` : ''}">\n`;
+};
+
+md.renderer.rules.layout_cell_close = (tokens, idx) => (tokens[idx].meta.kind === 'align' ? '' : '</div>\n');
+
+md.renderer.rules.layout_close = (tokens, idx) => (tokens[idx].meta.kind === 'tabs' ? '</div></div>\n' : '</div>\n');
+
 // v-pre / raw / code-group：与 vitepress containerPlugin 的注册顺序和 DOM 一致
 md.use(container, {
   name: 'v-pre',

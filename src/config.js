@@ -34,6 +34,12 @@ export const COPY_LABELS = {
 // 属于宿主壳，包内不读，也就不该出现在默认配置里
 export const DEFAULT_CONFIG = {
   locale: 'zh',
+  // ECharts 相关：height 为图表默认高度；mapTable.sourceUrl 是地图 GeoJSON 全局数据源
+  // （对应 cherry 的 toolbars.config.mapTable.sourceUrl；声明里的 mapDataSource 优先级更高）
+  echarts: {
+    height: 400,
+    mapTable: { sourceUrl: null },
+  },
   // Mermaid 语法代码块的渲染驱动：默认 Pele，可切回 Mermaid
   mermaidDriver: 'pele',
   // mark / sub / sup：`==高亮==`、`H~2~O`、`x^2^`，置 false 关闭
@@ -48,6 +54,9 @@ export const DEFAULT_CONFIG = {
     frontmatterParser: null,
     // 图片懒加载：对齐 VitePress，默认禁用，置 true 才给相对路径图片加 loading="lazy"
     image: { lazyLoad: false },
+    // 浏览器端 <<< / @include 展开：base 是站点部署前缀（静态文件从 `${base}${file}` fetch）。
+    // 仅当 createMarkdownComponent 传入 sourcePath 时按此展开；不进指纹（不改 md 单例渲染）。
+    include: { base: '/' },
     // [[toc]]：level 目录层级、showAutoNumber 标题/目录自动编号、allowMultiToc 允许多个目录
     toc: { level: [2, 3], showAutoNumber: false, allowMultiToc: true },
   },
@@ -104,10 +113,16 @@ export function createConfig({ base = '/', adapters, ...overrides } = {}) {
       ...overrides.markdown,
       image: { ...DEFAULT_CONFIG.markdown.image, ...overrides.markdown?.image },
       toc: { ...DEFAULT_CONFIG.markdown.toc, ...overrides.markdown?.toc },
+      include: { ...DEFAULT_CONFIG.markdown.include, ...overrides.markdown?.include },
     },
     labels: {
       container: overrides.labels?.container ?? CONTAINER_LABELS[key],
       copy: overrides.labels?.copy ?? COPY_LABELS[key],
+    },
+    echarts: {
+      ...DEFAULT_CONFIG.echarts,
+      ...overrides.echarts,
+      mapTable: { ...DEFAULT_CONFIG.echarts.mapTable, ...overrides.echarts?.mapTable },
     },
     adapters: { ...createBaseAdapters(base), ...patch },
   };
@@ -141,6 +156,8 @@ function configFingerprint(config) {
     container: md.container ?? [],
     frontmatterParser: Boolean(md.frontmatterParser),
     imageLazyLoad: md.image?.lazyLoad,
+    echartsHeight: config?.echarts?.height,
+    mapSourceUrl: config?.echarts?.mapTable?.sourceUrl,
     tocLevel: md.toc?.level,
     tocShowAutoNumber: md.toc?.showAutoNumber,
     tocAllowMultiToc: md.toc?.allowMultiToc,

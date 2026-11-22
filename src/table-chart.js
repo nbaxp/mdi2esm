@@ -101,6 +101,54 @@ const toNumber = (value) => {
   return Number.isFinite(num) ? num : null;
 };
 
+// 省名归一化，映射表与归一化逻辑对齐 cherry-markdown 的 provinceNameMap / normalizeProvinceName
+const PROVINCE_NAME_MAP = {
+  北京: '北京市',
+  天津: '天津市',
+  上海: '上海市',
+  重庆: '重庆市',
+  河北: '河北省',
+  山西: '山西省',
+  辽宁: '辽宁省',
+  吉林: '吉林省',
+  黑龙江: '黑龙江省',
+  江苏: '江苏省',
+  浙江: '浙江省',
+  安徽: '安徽省',
+  福建: '福建省',
+  江西: '江西省',
+  山东: '山东省',
+  河南: '河南省',
+  湖北: '湖北省',
+  湖南: '湖南省',
+  广东: '广东省',
+  海南: '海南省',
+  四川: '四川省',
+  贵州: '贵州省',
+  云南: '云南省',
+  陕西: '陕西省',
+  甘肃: '甘肃省',
+  青海: '青海省',
+  台湾: '台湾省',
+  内蒙古: '内蒙古自治区',
+  广西: '广西壮族自治区',
+  西藏: '西藏自治区',
+  宁夏: '宁夏回族自治区',
+  新疆: '新疆维吾尔自治区',
+  香港: '香港特别行政区',
+  澳门: '澳门特别行政区',
+};
+
+export function normalizeProvinceName(inputName) {
+  const name = String(inputName ?? '').trim();
+  if (PROVINCE_NAME_MAP[name]) return PROVINCE_NAME_MAP[name];
+  if (/(市|省|自治区|特别行政区)$/.test(name)) return name;
+  for (const [short, full] of Object.entries(PROVINCE_NAME_MAP)) {
+    if (full.includes(name) || name.includes(short)) return full;
+  }
+  return name;
+}
+
 // 表格数据 → ECharts option。约定：
 // - 通用类型（line/bar/scatter…）：表头作类目轴，每行一个 series（首列是系列名）；
 // - pie/funnel：两列（名称 / 数值）；
@@ -264,6 +312,46 @@ export function buildTableChartOption(type, options, header, rows) {
         data: records.map((row) => ({ name: String(row[0] ?? ''), value: row.slice(1).map(toNumber) })),
       },
     ];
+    return base;
+  }
+
+  // 地图：数据行首列是地区名（归一化省名），第二列是数值。
+  // series.map 用声明里的 mapDataSource（没有就 'china'）；GeoJSON 的 fetch/registerMap
+  // 与加载/失败态由组件层完成（见 echarts-table.js），这里只产出纯 option。
+  if (chartType === 'map') {
+    const source = typeof base.mapDataSource === 'string' && base.mapDataSource.trim() ? base.mapDataSource.trim() : '';
+    delete base.mapDataSource;
+    const data = records.map((row) => ({
+      name: normalizeProvinceName(String(row[0] ?? '')),
+      value: toNumber(row[1]) ?? 0,
+    }));
+    const values = data.map((item) => item.value);
+    base.tooltip = base.tooltip ?? {
+      trigger: 'item',
+      formatter: (params) => `${params.name}: ${params.value || 0}`,
+    };
+    base.visualMap = base.visualMap ?? {
+      min: values.length ? Math.min(...values) : 0,
+      max: values.length ? Math.max(...values) : 0,
+      left: 'left',
+      top: 'bottom',
+      text: ['高', '低'],
+      calculable: true,
+      inRange: { color: ['#e0f3f8', '#4292c6', '#084594'] },
+    };
+    base.series = [
+      {
+        name: typeof base.title?.text === 'string' ? base.title.text : '地图数据',
+        type: 'map',
+        map: source || 'china',
+        roam: true,
+        label: { show: true },
+        data,
+        emphasis: { label: { show: true, fontWeight: 'bold' } },
+      },
+    ];
+    // 组件层据此决定注册哪个 GeoJSON；不属于 ECharts option，setOption 前会被删除
+    base.__mdiMapSource = source;
     return base;
   }
 

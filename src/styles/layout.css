@@ -1,0 +1,132 @@
+/* 对齐 / 多列布局 / 选项卡：对齐 cherry-markdown 的 ::: 布局语法。
+   tabs 为纯 CSS（radio + label + :checked 兄弟选择器），无 JS，与 vp-code-group 同思路。 */
+
+.mdi-align-left {
+  text-align: left;
+}
+.mdi-align-center {
+  text-align: center;
+}
+.mdi-align-right {
+  text-align: right;
+}
+.mdi-align-justify {
+  text-align: justify;
+}
+
+/* 多列：每列等宽，窄屏退回单列 */
+.mdi-cols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  margin: 1rem 0;
+}
+.mdi-col {
+  flex: 1 1 0;
+  min-width: 12rem;
+}
+.mdi-cols-align-left .mdi-col {
+  text-align: left;
+}
+.mdi-cols-align-center .mdi-col {
+  text-align: center;
+}
+.mdi-cols-align-right .mdi-col {
+  text-align: right;
+}
+.mdi-cols-align-justify .mdi-col {
+  text-align: justify;
+}
+
+@media (max-width: 639px) {
+  .mdi-col {
+    flex-basis: 100%;
+  }
+}
+
+/* 选项卡：radio 隐藏，label 作标签栏，:checked 控制面板显隐 */
+.mdi-tabs {
+  margin: 1rem 0;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.mdi-tabs > input {
+  position: fixed;
+  opacity: 0;
+  pointer-events: none;
+}
+.mdi-tab-labels {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0 0.75rem;
+  background: var(--vp-c-bg-soft);
+  border-bottom: 1px solid var(--vp-c-divider);
+  overflow-x: auto;
+}
+.mdi-tab-labels label {
+  display: inline-block;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--vp-c-text-2);
+  white-space: nowrap;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition:
+    color 0.25s,
+    border-color 0.25s;
+}
+.mdi-tab-labels label:hover {
+  color: var(--vp-c-text-1);
+}
+.mdi-tab-panels {
+  padding: 0.75rem 1rem;
+}
+.mdi-tab-panel {
+  display: none;
+}
+.mdi-tab-panel-left {
+  text-align: left;
+}
+.mdi-tab-panel-center {
+  text-align: center;
+}
+.mdi-tab-panel-right {
+  text-align: right;
+}
+.mdi-tab-panel-justify {
+  text-align: justify;
+}
+
+/* 第 1 个 radio 选中 → 第 1 个标签高亮 + 第 1 个面板显示（最多支持 12 个 tab） */
+.mdi-tabs > input:nth-of-type(1):checked ~ .mdi-tab-labels label:nth-child(1),
+.mdi-tabs > input:nth-of-type(2):checked ~ .mdi-tab-labels label:nth-child(2),
+.mdi-tabs > input:nth-of-type(3):checked ~ .mdi-tab-labels label:nth-child(3),
+.mdi-tabs > input:nth-of-type(4):checked ~ .mdi-tab-labels label:nth-child(4),
+.mdi-tabs > input:nth-of-type(5):checked ~ .mdi-tab-labels label:nth-child(5),
+.mdi-tabs > input:nth-of-type(6):checked ~ .mdi-tab-labels label:nth-child(6),
+.mdi-tabs > input:nth-of-type(7):checked ~ .mdi-tab-labels label:nth-child(7),
+.mdi-tabs > input:nth-of-type(8):checked ~ .mdi-tab-labels label:nth-child(8),
+.mdi-tabs > input:nth-of-type(9):checked ~ .mdi-tab-labels label:nth-child(9),
+.mdi-tabs > input:nth-of-type(10):checked ~ .mdi-tab-labels label:nth-child(10),
+.mdi-tabs > input:nth-of-type(11):checked ~ .mdi-tab-labels label:nth-child(11),
+.mdi-tabs > input:nth-of-type(12):checked ~ .mdi-tab-labels label:nth-child(12) {
+  color: var(--vp-c-brand-1);
+  border-bottom-color: var(--vp-c-brand-1);
+}
+
+.mdi-tabs > input:nth-of-type(1):checked ~ .mdi-tab-panels > .mdi-tab-panel:nth-child(1),
+.mdi-tabs > input:nth-of-type(2):checked ~ .mdi-tab-panels > .mdi-tab-panel:nth-child(2),
+.mdi-tabs > input:nth-of-type(3):checked ~ .mdi-tab-panels > .mdi-tab-panel:nth-child(3),
+.mdi-tabs > input:nth-of-type(4):checked ~ .mdi-tab-panels > .mdi-tab-panel:nth-child(4),
+.mdi-tabs > input:nth-of-type(5):checked ~ .mdi-tab-panels > .mdi-tab-panel:nth-child(5),
+.mdi-tabs > input:nth-of-type(6):checked ~ .mdi-tab-panels > .mdi-tab-panel:nth-child(6),
+.mdi-tabs > input:nth-of-type(7):checked ~ .mdi-tab-panels > .mdi-tab-panel:nth-child(7),
+.mdi-tabs > input:nth-of-type(8):checked ~ .mdi-tab-panels > .mdi-tab-panel:nth-child(8),
+.mdi-tabs > input:nth-of-type(9):checked ~ .mdi-tab-panels > .mdi-tab-panel:nth-child(9),
+.mdi-tabs > input:nth-of-type(10):checked ~ .mdi-tab-panels > .mdi-tab-panel:nth-child(10),
+.mdi-tabs > input:nth-of-type(11):checked ~ .mdi-tab-panels > .mdi-tab-panel:nth-child(11),
+.mdi-tabs > input:nth-of-type(12):checked ~ .mdi-tab-panels > .mdi-tab-panel:nth-child(12) {
+  display: block;
+}

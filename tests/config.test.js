@@ -19,6 +19,10 @@ test('配置：schema 与默认预设', () => {
   assert.equal(DEFAULT_CONFIG.locale, 'zh');
   assert.equal(DEFAULT_CONFIG.mermaidDriver, 'pele');
   assert.equal(createConfig({ mermaidDriver: 'mermaid' }).mermaidDriver, 'mermaid');
+  assert.deepEqual(DEFAULT_CONFIG.echarts, { height: 400, mapTable: { sourceUrl: null } });
+  assert.deepEqual(createConfig({ echarts: { mapTable: { sourceUrl: '/geo/china.json' } } }).echarts.mapTable, {
+    sourceUrl: '/geo/china.json',
+  });
   assert.deepEqual(DEFAULT_CONFIG.markdown, {
     lineNumbers: false,
     math: true,
@@ -29,6 +33,7 @@ test('配置：schema 与默认预设', () => {
     scripts: true,
     frontmatterParser: null,
     image: { lazyLoad: false },
+    include: { base: '/' },
     toc: { level: [2, 3], showAutoNumber: false, allowMultiToc: true },
   });
 });
@@ -47,6 +52,7 @@ test('配置：createConfig 合并覆盖并按 locale 选文案', () => {
     scripts: true,
     frontmatterParser: null,
     image: { lazyLoad: false },
+    include: { base: '/' },
     toc: { level: [2, 3], showAutoNumber: false, allowMultiToc: true },
   });
   const custom = createConfig({ adapters: { toSrc: ({ src }) => `/x/${src}` } });

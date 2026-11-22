@@ -49,3 +49,18 @@ test('组件：markdown.scripts=false 时不装配 setup', async () => {
   const { component } = await createMarkdownComponent(SOURCE, '', config);
   assert.equal(component.setup, undefined);
 });
+
+test('组件：传入 sourcePath 时管线先展开 <<< 再渲染', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, text: async () => 'const x = 42;\n' });
+  try {
+    const { component } = await createMarkdownComponent('<<< @/snippets/integ.js\n\n正文', '', createConfig(), {
+      sourcePath: 'guide/page.md',
+    });
+    // 展开后生成带文件标题的代码块（高亮会把 const x = 42 拆成 token，故匹配标题）
+    assert.match(component.render.toString(), /data-title=\\"integ\.js\\"/);
+    assert.match(component.render.toString(), /language-js/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
