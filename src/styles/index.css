@@ -3,6 +3,7 @@
    由 build.mjs 的 lightningcss bundleAsync 内联为单文件；自定义样式按功能拆分。
    构建时合并为 dist/index.css 与 dist/index.min.css。 */
 @import 'vitepress/dist/client/theme-default/styles/vars.css';
+@import './color-scheme.css';
 @import 'vitepress/dist/client/theme-default/styles/icons.css';
 @import 'vitepress/dist/client/theme-default/styles/components/vp-doc.css';
 @import 'vitepress/dist/client/theme-default/styles/components/custom-block.css';
